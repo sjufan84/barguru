@@ -3,7 +3,7 @@
 import { experimental_useObject as useObject } from "@ai-sdk/react"
 import { FormEvent, useMemo, useState } from "react"
 
-import type { CocktailInput } from "@/app/schemas/cocktailSchemas"
+import type { CocktailInput, GenerateCocktail } from "@/app/schemas/cocktailSchemas"
 import { generateCocktailSchema } from "@/app/schemas/cocktailSchemas"
 import { GeneratedCocktailCard } from "@/components/cocktails/generated-cocktail-card"
 import { ModeToggle } from "@/components/themes/mode-toggle"
@@ -450,7 +450,7 @@ export default function HomePage() {
             <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_bottom_right,_rgba(196,175,144,0.2),transparent_55%)] dark:bg-[radial-gradient(circle_at_bottom_right,_rgba(84,67,51,0.35),transparent_65%)]" />
             <div className="space-y-6">
               <GeneratedCocktailCard
-                cocktail={generatedCocktail ?? undefined}
+                cocktail={generatedCocktail as Partial<GenerateCocktail> | undefined}
                 inputs={lastSubmittedInputs}
                 isLoading={isLoading}
                 onStop={stop}
