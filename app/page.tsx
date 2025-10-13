@@ -1,27 +1,16 @@
 "use client"
 
+import { experimental_useObject as useObject } from "@ai-sdk/react"
 import { FormEvent, useMemo, useState } from "react"
 
+import type { CocktailInput } from "@/app/schemas/cocktailSchemas"
+import { generateCocktailSchema } from "@/app/schemas/cocktailSchemas"
+import { GeneratedCocktailCard } from "@/components/cocktails/generated-cocktail-card"
 import { ModeToggle } from "@/components/themes/mode-toggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import type { CocktailInput } from "@/app/schemas/cocktailSchemas"
-
-type CocktailPreview = {
-  name: string
-  description: string
-  serve: string
-  pairing: string
-}
-
-type CocktailPreviewInputs = {
-  primaryIngredient: string
-  theme: string
-  cuisine?: string
-  type: CocktailInput["type"]
-}
 
 type IngredientOption = {
   value: string
@@ -141,62 +130,25 @@ const typeOptions: Array<{ value: CocktailInput["type"]; label: string }> = [
   { value: "craft", label: "Craft" },
 ]
 
-const suffixByType: Record<CocktailInput["type"], string> = {
-  classic: "Spritz",
-  standard: "Signature",
-  craft: "Elixir",
-}
-
-const serveByType: Record<CocktailInput["type"], string> = {
-  classic: "Built over clear ice in a chilled rocks glass with a considered garnish.",
-  standard: "Served up in a coupe with a gentle aromatized mist to finish.",
-  craft: "Presented in a stemmed Nick and Nora glass with layered garnish textures.",
-}
-
-const pairingByType: Record<CocktailInput["type"], string> = {
-  classic: "Pair with shareable bites or salty snacks to keep the bar ringing.",
-  standard: "Pairs with rich, slow-cooked dishes or late-night bar snacks.",
-  craft: "Pair with composed small plates or dessert flights for a story-driven moment.",
-}
-
-function toTitleCase(value: string) {
-  return value
-    .split(" ")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-}
-
-function buildCocktailPreview(inputs: CocktailPreviewInputs): CocktailPreview {
-  const primaryIngredient = toTitleCase(inputs.primaryIngredient.trim())
-  const theme = toTitleCase(inputs.theme.trim())
-  const cuisine = inputs.cuisine?.trim()
-
-  const nameSeed = [theme || "Signature", primaryIngredient].filter(Boolean).join(" ")
-  const name =
-    nameSeed.length > 0
-      ? `${nameSeed} ${suffixByType[inputs.type]}`
-      : `${suffixByType[inputs.type]} Showcase`
-
-  const descriptionFragments = [
-    `A ${inputs.type} style cocktail built around ${primaryIngredient || "your featured ingredient"}.`,
-    theme ? `Expect ${theme.toLowerCase()} expressions in aroma and finish.` : null,
-    cuisine ? `Designed to vibe with ${cuisine} inspired service.` : null,
-  ].filter(Boolean)
-
-  return {
-    name,
-    description: descriptionFragments.join(" "),
-    serve: serveByType[inputs.type],
-    pairing: pairingByType[inputs.type],
-  }
-}
-
 export default function HomePage() {
   const [formState, setFormState] = useState<CocktailFormState>(initialFormState)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [preview, setPreview] = useState<CocktailPreview | null>(null)
+  const [lastSubmittedInputs, setLastSubmittedInputs] =
+    useState<CocktailInput | null>(null)
+
+  const {
+    object: generatedCocktail,
+    submit,
+    isLoading,
+    stop,
+    error,
+  } = useObject({
+    api: "/api/generate-cocktail",
+    schema: generateCocktailSchema,
+  })
+
+  const normalizedError =
+    error instanceof Error ? error : error ? new Error(String(error)) : null
 
   const resolvedPrimaryIngredient = useMemo(() => {
     if (!formState.primaryIngredientSelection.trim()) {
@@ -212,8 +164,8 @@ export default function HomePage() {
 
   const isGenerateDisabled = useMemo(
     () =>
-      !resolvedPrimaryIngredient || !formState.theme.trim() || isSubmitting,
-    [resolvedPrimaryIngredient, formState.theme, isSubmitting],
+      !resolvedPrimaryIngredient || !formState.theme.trim() || isLoading,
+    [resolvedPrimaryIngredient, formState.theme, isLoading],
   )
 
   function validateInputs(state: CocktailFormState) {
@@ -271,30 +223,37 @@ export default function HomePage() {
     })
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setIsSubmitting(true)
 
     const errors = validateInputs(formState)
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors)
-      setIsSubmitting(false)
       return
     }
 
-    setPreview(null)
-    const generatedPreview = buildCocktailPreview({
-      primaryIngredient: resolvedPrimaryIngredient,
-      theme: formState.theme,
-      cuisine: formState.cuisine,
-      type: formState.type,
-    })
+    const primaryIngredient = resolvedPrimaryIngredient.trim()
+    if (!primaryIngredient) {
+      return
+    }
 
-    // Simulate a short wait to mirror generation latency.
-    setTimeout(() => {
-      setPreview(generatedPreview)
-      setIsSubmitting(false)
-    }, 450)
+    const trimmedTheme = formState.theme.trim()
+    const trimmedCuisine = formState.cuisine?.trim()
+
+    const input: CocktailInput = {
+      primaryIngredient,
+      theme: trimmedTheme,
+      cuisine: trimmedCuisine ? trimmedCuisine : undefined,
+      type: formState.type,
+    }
+
+    setLastSubmittedInputs(input)
+
+    try {
+      await submit(input)
+    } catch (submissionError) {
+      console.error("Cocktail generation failed", submissionError)
+    }
   }
 
   return (
@@ -482,55 +441,24 @@ export default function HomePage() {
                 disabled={isGenerateDisabled}
                 className="min-w-[10rem]"
               >
-                {isSubmitting ? "Gathering ideas..." : "Generate cocktail"}
+                {isLoading ? "Gathering ideas..." : "Generate cocktail"}
               </Button>
             </div>
           </form>
 
           <aside className="relative flex h-full flex-col justify-between overflow-hidden rounded-3xl border border-border/60 bg-card/95 p-6 shadow-inner shadow-black/5 backdrop-blur-sm sm:p-8">
             <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_bottom_right,_rgba(196,175,144,0.2),transparent_55%)] dark:bg-[radial-gradient(circle_at_bottom_right,_rgba(84,67,51,0.35),transparent_65%)]" />
-            <div className="space-y-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-                Preview
-              </p>
-              {preview ? (
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-semibold text-primary">{preview.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {preview.description}
-                    </p>
-                  </div>
-                  <div className="space-y-4 rounded-xl border border-border/70 bg-background/80 p-4">
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        Serve
-                      </p>
-                      <p className="text-sm">{preview.serve}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        Pairing
-                      </p>
-                      <p className="text-sm">{preview.pairing}</p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4 rounded-xl border border-dashed border-border/60 bg-background/60 p-4">
-                  <h3 className="text-lg font-medium">
-                    Your cocktail sketch will appear here.
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Add your ingredient and direction, then generate to see a suggested
-                    name, serve, and pairing recommendations you can refine with your
-                    team.
-                  </p>
-                </div>
-              )}
+            <div className="space-y-6">
+              <GeneratedCocktailCard
+                cocktail={generatedCocktail ?? undefined}
+                inputs={lastSubmittedInputs}
+                isLoading={isLoading}
+                onStop={stop}
+                error={normalizedError}
+              />
             </div>
             <div className="mt-8 rounded-xl border border-border/60 bg-secondary/60 p-4 text-xs text-secondary-foreground">
-              Tip: try contrasting inputs like "charred citrus" with "after-dinner" to
+              Tip: try contrasting inputs like “charred citrus” with “after-dinner” to
               stretch your menu in fresh directions.
             </div>
           </aside>
