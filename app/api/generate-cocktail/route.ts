@@ -6,7 +6,7 @@ import { ZodError } from "zod"
 import {
   cocktailInputSchema,
   generateCocktailSchema,
-} from "@/app/schemas/cocktailSchemas"
+} from "@/schemas/cocktailSchemas"
 
 export const maxDuration = 30
 

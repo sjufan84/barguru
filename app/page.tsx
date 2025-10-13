@@ -1,10 +1,10 @@
 "use client"
 
 import { experimental_useObject as useObject } from "@ai-sdk/react"
-import { FormEvent, useMemo, useState } from "react"
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
 
-import type { CocktailInput, GenerateCocktail } from "@/app/schemas/cocktailSchemas"
-import { generateCocktailSchema } from "@/app/schemas/cocktailSchemas"
+import type { CocktailInput, GenerateCocktail } from "@/schemas/cocktailSchemas"
+import { generateCocktailSchema } from "@/schemas/cocktailSchemas"
 import { GeneratedCocktailCard } from "@/components/cocktails/generated-cocktail-card"
 import { ModeToggle } from "@/components/themes/mode-toggle"
 import { Button } from "@/components/ui/button"
@@ -130,11 +130,17 @@ const typeOptions: Array<{ value: CocktailInput["type"]; label: string }> = [
   { value: "craft", label: "Craft" },
 ]
 
+function formatServiceStyle(value: CocktailInput["type"]) {
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
 export default function HomePage() {
   const [formState, setFormState] = useState<CocktailFormState>(initialFormState)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [lastSubmittedInputs, setLastSubmittedInputs] =
     useState<CocktailInput | null>(null)
+  const generatedCardRef = useRef<HTMLDivElement>(null)
+  const previousIsLoading = useRef(false)
 
   const {
     object: generatedCocktail,
@@ -167,6 +173,22 @@ export default function HomePage() {
       !resolvedPrimaryIngredient || !formState.theme.trim() || isLoading,
     [resolvedPrimaryIngredient, formState.theme, isLoading],
   )
+
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      isLoading &&
+      !previousIsLoading.current &&
+      window.innerWidth < 1024
+    ) {
+      generatedCardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    }
+
+    previousIsLoading.current = isLoading
+  }, [isLoading])
 
   function validateInputs(state: CocktailFormState) {
     const errors: Record<string, string> = {}
@@ -295,10 +317,85 @@ export default function HomePage() {
         <div className="mt-12 grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
           <form
             onSubmit={handleSubmit}
-            className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/95 p-6 shadow-lg shadow-black/5 backdrop-blur-sm sm:p-8"
+            aria-busy={isLoading}
+            className={`relative overflow-hidden rounded-3xl border border-border/70 bg-card/95 p-6 shadow-lg shadow-black/5 backdrop-blur-sm transition duration-200 sm:p-8 ${
+              isLoading ? "ring-1 ring-primary/30" : ""
+            }`}
           >
             <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(205,184,150,0.22),transparent_55%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(92,71,53,0.35),transparent_60%)]" />
-            <fieldset className="grid gap-6">
+            {isLoading ? (
+              <div
+                aria-live="polite"
+                className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-xs text-primary sm:text-sm"
+              >
+                <div className="space-y-1">
+                  <p className="font-medium uppercase tracking-[0.28em]">
+                    Generating
+                  </p>
+                  <p className="text-[0.7rem] uppercase tracking-[0.24em] text-primary/80">
+                    Crafting your cocktail brief
+                  </p>
+                </div>
+                <span className="relative flex h-3 w-3">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/30" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-primary" />
+                </span>
+              </div>
+            ) : null}
+
+            {lastSubmittedInputs ? (
+              <div
+                className={`mb-6 space-y-3 rounded-2xl border border-border/60 bg-background/85 p-4 shadow-inner shadow-black/5 transition duration-200 ${
+                  isLoading ? "border-primary/40 shadow-primary/10" : ""
+                }`}
+              >
+                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+                  Current brief
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-xs text-secondary-foreground">
+                    <span className="uppercase tracking-[0.24em] text-[0.65rem]">
+                      Ingredient
+                    </span>
+                    <span className="text-sm font-medium text-foreground">
+                      {lastSubmittedInputs.primaryIngredient}
+                    </span>
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-xs text-secondary-foreground">
+                    <span className="uppercase tracking-[0.24em] text-[0.65rem]">
+                      Theme
+                    </span>
+                    <span className="text-sm font-medium text-foreground">
+                      {lastSubmittedInputs.theme}
+                    </span>
+                  </span>
+                  {lastSubmittedInputs.cuisine ? (
+                    <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-xs text-secondary-foreground">
+                      <span className="uppercase tracking-[0.24em] text-[0.65rem]">
+                        Cuisine
+                      </span>
+                      <span className="text-sm font-medium text-foreground">
+                        {lastSubmittedInputs.cuisine}
+                      </span>
+                    </span>
+                  ) : null}
+                  <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-xs text-secondary-foreground">
+                    <span className="uppercase tracking-[0.24em] text-[0.65rem]">
+                      Service
+                    </span>
+                    <span className="text-sm font-medium text-foreground">
+                      {formatServiceStyle(lastSubmittedInputs.type)}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            <fieldset
+              aria-disabled={isLoading}
+              className="grid gap-6"
+              disabled={isLoading}
+            >
               <div className="space-y-2">
                 <Label htmlFor="primaryIngredientSelection">Primary ingredient</Label>
                 <div className="relative">
@@ -446,7 +543,10 @@ export default function HomePage() {
             </div>
           </form>
 
-          <aside className="relative flex h-full flex-col justify-between overflow-hidden rounded-3xl border border-border/60 bg-card/95 p-6 shadow-inner shadow-black/5 backdrop-blur-sm sm:p-8">
+          <aside
+            ref={generatedCardRef}
+            className="relative flex h-full flex-col justify-between overflow-hidden rounded-3xl border border-border/60 bg-card/95 p-6 shadow-inner shadow-black/5 backdrop-blur-sm sm:p-8"
+          >
             <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_bottom_right,_rgba(196,175,144,0.2),transparent_55%)] dark:bg-[radial-gradient(circle_at_bottom_right,_rgba(84,67,51,0.35),transparent_65%)]" />
             <div className="space-y-6">
               <GeneratedCocktailCard
@@ -458,7 +558,7 @@ export default function HomePage() {
               />
             </div>
             <div className="mt-8 rounded-xl border border-border/60 bg-secondary/60 p-4 text-xs text-secondary-foreground">
-              Tip: try contrasting inputs like “charred citrus” with “after-dinner” to
+              Tip: try contrasting inputs like &quot;charred citrus&quot; with &quot;after-dinner&quot; to
               stretch your menu in fresh directions.
             </div>
           </aside>

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 
-import type { CocktailInput, GenerateCocktail } from "@/app/schemas/cocktailSchemas"
+import type { CocktailInput, GenerateCocktail } from "@/schemas/cocktailSchemas"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
