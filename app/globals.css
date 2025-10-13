@@ -120,3 +120,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .cocktail-card {
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+  }
+
+  .cocktail-card-actions {
+    display: none !important;
+  }
+}

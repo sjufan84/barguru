@@ -1,0 +1,12 @@
+[install]
+# Use bun's fast package manager
+cache = true
+# Prefer bun's native package resolution
+exact = false
+
+[install.scopes]
+# Configure any scoped packages if needed
+
+[run]
+# Configure bun run behavior
+# No specific configuration needed for basic usage
