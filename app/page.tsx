@@ -303,9 +303,12 @@ export default function HomePage() {
     [resolvedPrimaryIngredient, formState.theme, isLoading],
   )
 
-  const showCollapsedBrief = Boolean(
+  const shouldHideForm = Boolean(
     isFormCollapsed && lastSubmittedInputs && !isLoading,
   )
+  const handleCreateNewCocktail = useCallback(() => {
+    resetFormCollapsePreferences()
+  }, [resetFormCollapsePreferences])
 
   useEffect(() => {
     if (
@@ -471,13 +474,12 @@ export default function HomePage() {
           </div>
         </section>
 
-        <div className="mt-12 grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-          {showCollapsedBrief && lastSubmittedInputs ? (
-            <CollapsedBriefCard
-              inputs={lastSubmittedInputs}
-              onExpand={() => handleManualCollapse(false)}
-            />
-          ) : (
+        <div
+          className={`mt-12 grid gap-8 ${
+            !shouldHideForm ? "lg:grid-cols-[1.05fr_0.95fr]" : ""
+          }`}
+        >
+          {!shouldHideForm ? (
             <form
               onSubmit={handleSubmit}
               aria-busy={isLoading}
@@ -681,7 +683,7 @@ export default function HomePage() {
               </Button>
             </div>
           </form>
-          )}
+          ) : null}
 
           <aside
             ref={generatedCardRef}
@@ -700,6 +702,7 @@ export default function HomePage() {
                 imageAlt={imageState.status === "ready" ? imageState.alt : undefined}
                 imageError={imageState.status === "error" ? imageState.error : null}
                 onRetryImage={handleRetryImage}
+                onCreateNewCocktail={handleCreateNewCocktail}
               />
             </div>
             <div className="mt-8 rounded-xl border border-border/60 bg-secondary/60 p-4 text-xs text-secondary-foreground">
@@ -710,34 +713,6 @@ export default function HomePage() {
         </div>
       </div>
     </main>
-  )
-}
-
-function CollapsedBriefCard({
-  inputs,
-  onExpand,
-}: {
-  inputs: CocktailInput
-  onExpand: () => void
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/95 p-6 shadow-lg shadow-black/5 backdrop-blur-sm sm:p-8">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(205,184,150,0.22),transparent_55%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(92,71,53,0.35),transparent_60%)]" />
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-            Current brief
-          </p>
-          <Button type="button" variant="ghost" size="sm" onClick={onExpand} className="text-xs">
-            Edit brief
-          </Button>
-        </div>
-        <BriefChips inputs={inputs} />
-        <p className="text-xs text-muted-foreground">
-          Your prompt stays pinned here. Expand to tweak details for the next round.
-        </p>
-      </div>
-    </div>
   )
 }
 

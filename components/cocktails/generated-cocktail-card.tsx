@@ -1,7 +1,8 @@
-import type { ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 
 import type { CocktailInput, GenerateCocktail } from "@/schemas/cocktailSchemas"
 import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 
 interface GeneratedCocktailCardProps {
@@ -15,6 +16,7 @@ interface GeneratedCocktailCardProps {
   imageAlt?: string
   imageError?: string | null
   onRetryImage?: () => void
+  onCreateNewCocktail?: () => void
 }
 
 export function GeneratedCocktailCard({
@@ -28,7 +30,16 @@ export function GeneratedCocktailCard({
   imageAlt,
   imageError,
   onRetryImage,
+  onCreateNewCocktail,
 }: GeneratedCocktailCardProps) {
+  const [isBriefExpanded, setIsBriefExpanded] = useState(false)
+
+  useEffect(() => {
+    if (inputs) {
+      setIsBriefExpanded(false)
+    }
+  }, [inputs])
+
   const hasGeneratedContent = Boolean(
     cocktail &&
       (cocktail.name ||
@@ -43,7 +54,14 @@ export function GeneratedCocktailCard({
 
   return (
     <div className="space-y-6">
-      {inputs ? <InputSummary inputs={inputs} /> : null}
+      {inputs ? (
+        <CurrentBriefSection
+          inputs={inputs}
+          isExpanded={isBriefExpanded}
+          onToggle={() => setIsBriefExpanded((previous) => !previous)}
+          onCreateNewCocktail={onCreateNewCocktail}
+        />
+      ) : null}
 
       <div className="space-y-5 rounded-xl border border-border/70 bg-background/80 p-5 shadow-inner shadow-black/5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -103,21 +121,109 @@ export function GeneratedCocktailCard({
   )
 }
 
-function InputSummary({ inputs }: { inputs: CocktailInput }) {
+function CurrentBriefSection({
+  inputs,
+  isExpanded,
+  onToggle,
+  onCreateNewCocktail,
+}: {
+  inputs: CocktailInput
+  isExpanded: boolean
+  onToggle: () => void
+  onCreateNewCocktail?: () => void
+}) {
   return (
-    <div className="rounded-xl border border-border/60 bg-background/80 p-4 shadow-inner shadow-black/5">
-      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-        Request snapshot
-      </p>
-      <dl className="mt-3 grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
-        <SummaryItem label="Primary ingredient" value={inputs.primaryIngredient} />
-        <SummaryItem label="Theme" value={inputs.theme} />
-        {inputs.cuisine ? (
-          <SummaryItem label="Cuisine pairing" value={inputs.cuisine} />
-        ) : null}
-        <SummaryItem label="Service style" value={formatServiceStyle(inputs.type)} />
-      </dl>
+    <section className="rounded-xl border border-border/60 bg-background/80 p-4 shadow-inner shadow-black/5 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+          Current brief
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {onCreateNewCocktail ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onCreateNewCocktail}
+              className="text-xs"
+            >
+              New cocktail
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onToggle}
+            className="text-xs"
+            aria-expanded={isExpanded}
+          >
+            {isExpanded ? "Hide details" : "Show details"}
+          </Button>
+        </div>
+      </div>
+
+      {isExpanded ? (
+        <>
+          <Separator className="my-4 bg-border/60" />
+          <BriefDetails inputs={inputs} />
+        </>
+      ) : (
+        <>
+          <div className="mt-4">
+            <BriefChips inputs={inputs} />
+          </div>
+          <p className="mt-3 text-[0.7rem] text-muted-foreground">
+            Expand to review or tweak the brief before your next round.
+          </p>
+        </>
+      )}
+    </section>
+  )
+}
+
+function BriefDetails({ inputs }: { inputs: CocktailInput }) {
+  return (
+    <dl className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
+      <SummaryItem label="Primary ingredient" value={inputs.primaryIngredient} />
+      <SummaryItem label="Theme" value={inputs.theme} />
+      {inputs.cuisine ? (
+        <SummaryItem label="Cuisine pairing" value={inputs.cuisine} />
+      ) : null}
+      <SummaryItem label="Service style" value={formatServiceStyle(inputs.type)} />
+    </dl>
+  )
+}
+
+function BriefChips({ inputs }: { inputs: CocktailInput }) {
+  const chips = [
+    { label: "Ingredient", value: inputs.primaryIngredient },
+    { label: "Theme", value: inputs.theme },
+    ...(inputs.cuisine ? [{ label: "Cuisine", value: inputs.cuisine }] : []),
+    { label: "Service", value: formatServiceStyle(inputs.type) },
+  ]
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {chips.map(({ label, value }) => (
+        <BriefChip key={`${label}-${value}`} label={label} value={value} />
+      ))}
     </div>
+  )
+}
+
+function BriefChip({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-xs text-secondary-foreground">
+      <span className="uppercase tracking-[0.24em] text-[0.65rem]">{label}</span>
+      <span className="text-sm font-medium text-foreground">{value}</span>
+    </span>
   )
 }
 
