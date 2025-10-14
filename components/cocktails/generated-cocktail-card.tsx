@@ -10,6 +10,11 @@ interface GeneratedCocktailCardProps {
   isLoading: boolean
   onStop?: () => void
   error?: Error | null
+  imageStatus?: "idle" | "loading" | "ready" | "error"
+  imageUrl?: string
+  imageAlt?: string
+  imageError?: string | null
+  onRetryImage?: () => void
 }
 
 export function GeneratedCocktailCard({
@@ -18,6 +23,11 @@ export function GeneratedCocktailCard({
   isLoading,
   onStop,
   error,
+  imageStatus = "idle",
+  imageUrl,
+  imageAlt,
+  imageError,
+  onRetryImage,
 }: GeneratedCocktailCardProps) {
   const hasGeneratedContent = Boolean(
     cocktail &&
@@ -72,6 +82,14 @@ export function GeneratedCocktailCard({
             </Button>
           </div>
         ) : null}
+
+        <ImagePreviewSection
+          status={imageStatus}
+          imageUrl={imageUrl}
+          imageAlt={imageAlt}
+          errorMessage={imageError}
+          onRetry={onRetryImage}
+        />
 
         {hasGeneratedContent ? (
           <GeneratedContent cocktail={cocktail} isLoading={isLoading} />
@@ -224,6 +242,79 @@ function GeneratedContent({
           </p>
         )}
       </section>
+    </div>
+  )
+}
+
+function ImagePreviewSection({
+  status,
+  imageUrl,
+  imageAlt,
+  errorMessage,
+  onRetry,
+}: {
+  status: "idle" | "loading" | "ready" | "error"
+  imageUrl?: string
+  imageAlt?: string
+  errorMessage?: string | null
+  onRetry?: () => void
+}) {
+  if (status === "idle") {
+    return null
+  }
+
+  if (status === "ready" && imageUrl) {
+    return (
+      <section className="space-y-3">
+        <SectionHeading>Visual concept</SectionHeading>
+        <figure className="overflow-hidden rounded-2xl border border-border/70 bg-background/90 shadow-inner shadow-black/5">
+          <img
+            src={imageUrl}
+            alt={imageAlt ?? "Concept cocktail render"}
+            className="aspect-square h-auto w-full object-cover"
+          />
+          <figcaption className="border-t border-border/70 bg-background/80 px-4 py-2 text-[0.7rem] font-semibold uppercase tracking-[0.25em] text-muted-foreground/80">
+            Ready for moodboarding
+          </figcaption>
+        </figure>
+      </section>
+    )
+  }
+
+  if (status === "loading") {
+    return (
+      <section className="space-y-3">
+        <SectionHeading>Visual concept</SectionHeading>
+        <ImageSkeleton />
+      </section>
+    )
+  }
+
+  return (
+    <section className="space-y-3">
+      <SectionHeading>Visual concept</SectionHeading>
+      <div className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <p>{errorMessage ?? "We couldn&apos;t generate an image this time."}</p>
+        {onRetry ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            className="border-destructive/40 text-destructive hover:text-destructive"
+          >
+            Try again
+          </Button>
+        ) : null}
+      </div>
+    </section>
+  )
+}
+
+function ImageSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border/70 bg-muted/20">
+      <div className="aspect-square w-full animate-pulse bg-gradient-to-br from-muted/50 via-muted/20 to-muted/50" />
     </div>
   )
 }

@@ -1,7 +1,14 @@
 "use client"
 
 import { experimental_useObject as useObject } from "@ai-sdk/react"
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
 import type { CocktailInput, GenerateCocktail } from "@/schemas/cocktailSchemas"
 import { generateCocktailSchema } from "@/schemas/cocktailSchemas"
@@ -134,6 +141,12 @@ function formatServiceStyle(value: CocktailInput["type"]) {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
+type CocktailImageState =
+  | { status: "idle"; url?: undefined; alt?: undefined; error?: undefined }
+  | { status: "loading"; url?: undefined; alt?: undefined; error?: undefined }
+  | { status: "ready"; url: string; alt: string; error?: undefined }
+  | { status: "error"; url?: undefined; alt?: undefined; error: string }
+
 export default function HomePage() {
   const [formState, setFormState] = useState<CocktailFormState>(initialFormState)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
@@ -141,6 +154,24 @@ export default function HomePage() {
     useState<CocktailInput | null>(null)
   const generatedCardRef = useRef<HTMLDivElement>(null)
   const previousIsLoading = useRef(false)
+  const [imageState, setImageState] = useState<CocktailImageState>({
+    status: "idle",
+  })
+  const imageRequestKeyRef = useRef<string | null>(null)
+  const imageRequestIdRef = useRef(0)
+  const imageAbortRef = useRef<AbortController | null>(null)
+  const [isFormCollapsed, setIsFormCollapsed] = useState(false)
+  const [hasUserToggledForm, setHasUserToggledForm] = useState(false)
+
+  const handleManualCollapse = useCallback((next: boolean) => {
+    setIsFormCollapsed(next)
+    setHasUserToggledForm(true)
+  }, [])
+
+  const resetFormCollapsePreferences = useCallback(() => {
+    setIsFormCollapsed(false)
+    setHasUserToggledForm(false)
+  }, [])
 
   const {
     object: generatedCocktail,
@@ -153,8 +184,106 @@ export default function HomePage() {
     schema: generateCocktailSchema,
   })
 
+  useEffect(() => {
+    return () => {
+      imageAbortRef.current?.abort()
+    }
+  }, [])
+
   const normalizedError =
     error instanceof Error ? error : error ? new Error(String(error)) : null
+
+  const startImageRequest = useCallback(
+    (
+      cocktail: GenerateCocktail,
+      inputs: CocktailInput | null,
+      options?: { force?: boolean },
+    ) => {
+      const force = options?.force ?? false
+      const requestKey = buildImageRequestKey(cocktail, inputs)
+      if (!force && imageRequestKeyRef.current === requestKey) {
+        return
+      }
+
+      imageAbortRef.current?.abort()
+
+      imageRequestKeyRef.current = requestKey
+      const controller = new AbortController()
+      imageAbortRef.current = controller
+      const requestId = ++imageRequestIdRef.current
+
+      setImageState({ status: "loading" })
+
+      ;(async () => {
+        try {
+          const response = await fetch("/api/generate-cocktail-image", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ cocktail, inputs: inputs ?? undefined }),
+            signal: controller.signal,
+          })
+
+          const text = await response.text()
+
+          if (!response.ok) {
+            let message = "Image generation failed."
+            try {
+              const parsed = JSON.parse(text) as { error?: string }
+              if (parsed?.error) {
+                message = parsed.error
+              }
+            } catch {
+              // ignore parsing errors
+            }
+            throw new Error(message)
+          }
+
+          let payload: { imageUrl?: string } | null = null
+          try {
+            payload = JSON.parse(text)
+          } catch {
+            // ignore parsing errors
+          }
+
+          if (imageRequestIdRef.current !== requestId) {
+            return
+          }
+
+          if (!payload?.imageUrl) {
+            throw new Error("Image data was missing from the response.")
+          }
+
+          const alt = `Concept image for the ${cocktail.name} cocktail`
+          setImageState({ status: "ready", url: payload.imageUrl, alt })
+        } catch (imageError) {
+          if (controller.signal.aborted || imageRequestIdRef.current !== requestId) {
+            return
+          }
+
+          const message =
+            imageError instanceof Error
+              ? imageError.message
+              : "Image generation failed."
+          setImageState({ status: "error", error: message })
+        } finally {
+          if (imageAbortRef.current === controller) {
+            imageAbortRef.current = null
+          }
+        }
+      })()
+    },
+    [],
+  )
+
+  const handleRetryImage = useCallback(() => {
+    if (!lastSubmittedInputs || !canGenerateImage(generatedCocktail as Partial<GenerateCocktail> | undefined)) {
+      return
+    }
+
+    startImageRequest(generatedCocktail as GenerateCocktail, lastSubmittedInputs, { force: true })
+  }, [generatedCocktail, lastSubmittedInputs, startImageRequest])
 
   const resolvedPrimaryIngredient = useMemo(() => {
     if (!formState.primaryIngredientSelection.trim()) {
@@ -174,6 +303,10 @@ export default function HomePage() {
     [resolvedPrimaryIngredient, formState.theme, isLoading],
   )
 
+  const showCollapsedBrief = Boolean(
+    isFormCollapsed && lastSubmittedInputs && !isLoading,
+  )
+
   useEffect(() => {
     if (
       typeof window !== "undefined" &&
@@ -189,6 +322,25 @@ export default function HomePage() {
 
     previousIsLoading.current = isLoading
   }, [isLoading])
+
+  useEffect(() => {
+    if (
+      !isLoading &&
+      generatedCocktail?.name &&
+      lastSubmittedInputs &&
+      !hasUserToggledForm
+    ) {
+      setIsFormCollapsed(true)
+    }
+  }, [generatedCocktail, hasUserToggledForm, isLoading, lastSubmittedInputs])
+
+  useEffect(() => {
+    if (isLoading || !lastSubmittedInputs || !canGenerateImage(generatedCocktail as Partial<GenerateCocktail> | undefined)) {
+      return
+    }
+
+    startImageRequest(generatedCocktail as GenerateCocktail, lastSubmittedInputs)
+  }, [generatedCocktail, isLoading, lastSubmittedInputs, startImageRequest])
 
   function validateInputs(state: CocktailFormState) {
     const errors: Record<string, string> = {}
@@ -269,6 +421,11 @@ export default function HomePage() {
       type: formState.type,
     }
 
+    resetFormCollapsePreferences()
+    imageAbortRef.current?.abort()
+    imageRequestIdRef.current += 1
+    imageRequestKeyRef.current = null
+    setImageState({ status: "idle" })
     setLastSubmittedInputs(input)
 
     try {
@@ -315,13 +472,19 @@ export default function HomePage() {
         </section>
 
         <div className="mt-12 grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-          <form
-            onSubmit={handleSubmit}
-            aria-busy={isLoading}
-            className={`relative overflow-hidden rounded-3xl border border-border/70 bg-card/95 p-6 shadow-lg shadow-black/5 backdrop-blur-sm transition duration-200 sm:p-8 ${
-              isLoading ? "ring-1 ring-primary/30" : ""
-            }`}
-          >
+          {showCollapsedBrief && lastSubmittedInputs ? (
+            <CollapsedBriefCard
+              inputs={lastSubmittedInputs}
+              onExpand={() => handleManualCollapse(false)}
+            />
+          ) : (
+            <form
+              onSubmit={handleSubmit}
+              aria-busy={isLoading}
+              className={`relative overflow-hidden rounded-3xl border border-border/70 bg-card/95 p-6 shadow-lg shadow-black/5 backdrop-blur-sm transition duration-200 sm:p-8 ${
+                isLoading ? "ring-1 ring-primary/30" : ""
+              }`}
+            >
             <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(205,184,150,0.22),transparent_55%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(92,71,53,0.35),transparent_60%)]" />
             {isLoading ? (
               <div
@@ -349,45 +512,21 @@ export default function HomePage() {
                   isLoading ? "border-primary/40 shadow-primary/10" : ""
                 }`}
               >
-                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-                  Current brief
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-xs text-secondary-foreground">
-                    <span className="uppercase tracking-[0.24em] text-[0.65rem]">
-                      Ingredient
-                    </span>
-                    <span className="text-sm font-medium text-foreground">
-                      {lastSubmittedInputs.primaryIngredient}
-                    </span>
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-xs text-secondary-foreground">
-                    <span className="uppercase tracking-[0.24em] text-[0.65rem]">
-                      Theme
-                    </span>
-                    <span className="text-sm font-medium text-foreground">
-                      {lastSubmittedInputs.theme}
-                    </span>
-                  </span>
-                  {lastSubmittedInputs.cuisine ? (
-                    <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-xs text-secondary-foreground">
-                      <span className="uppercase tracking-[0.24em] text-[0.65rem]">
-                        Cuisine
-                      </span>
-                      <span className="text-sm font-medium text-foreground">
-                        {lastSubmittedInputs.cuisine}
-                      </span>
-                    </span>
-                  ) : null}
-                  <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-xs text-secondary-foreground">
-                    <span className="uppercase tracking-[0.24em] text-[0.65rem]">
-                      Service
-                    </span>
-                    <span className="text-sm font-medium text-foreground">
-                      {formatServiceStyle(lastSubmittedInputs.type)}
-                    </span>
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+                    Current brief
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleManualCollapse(true)}
+                    className="text-xs"
+                  >
+                    Hide brief
+                  </Button>
                 </div>
+                <BriefChips inputs={lastSubmittedInputs} />
               </div>
             ) : null}
 
@@ -542,6 +681,7 @@ export default function HomePage() {
               </Button>
             </div>
           </form>
+          )}
 
           <aside
             ref={generatedCardRef}
@@ -555,6 +695,11 @@ export default function HomePage() {
                 isLoading={isLoading}
                 onStop={stop}
                 error={normalizedError}
+                imageStatus={imageState.status}
+                imageUrl={imageState.status === "ready" ? imageState.url : undefined}
+                imageAlt={imageState.status === "ready" ? imageState.alt : undefined}
+                imageError={imageState.status === "error" ? imageState.error : null}
+                onRetryImage={handleRetryImage}
               />
             </div>
             <div className="mt-8 rounded-xl border border-border/60 bg-secondary/60 p-4 text-xs text-secondary-foreground">
@@ -565,5 +710,98 @@ export default function HomePage() {
         </div>
       </div>
     </main>
+  )
+}
+
+function CollapsedBriefCard({
+  inputs,
+  onExpand,
+}: {
+  inputs: CocktailInput
+  onExpand: () => void
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/95 p-6 shadow-lg shadow-black/5 backdrop-blur-sm sm:p-8">
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(205,184,150,0.22),transparent_55%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(92,71,53,0.35),transparent_60%)]" />
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+            Current brief
+          </p>
+          <Button type="button" variant="ghost" size="sm" onClick={onExpand} className="text-xs">
+            Edit brief
+          </Button>
+        </div>
+        <BriefChips inputs={inputs} />
+        <p className="text-xs text-muted-foreground">
+          Your prompt stays pinned here. Expand to tweak details for the next round.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function BriefChips({ inputs }: { inputs: CocktailInput }) {
+  const chips = [
+    { label: "Ingredient", value: inputs.primaryIngredient },
+    { label: "Theme", value: inputs.theme },
+    ...(inputs.cuisine ? [{ label: "Cuisine", value: inputs.cuisine }] : []),
+    { label: "Service", value: formatServiceStyle(inputs.type) },
+  ]
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {chips.map(({ label, value }) => (
+        <BriefChip key={`${label}-${value}`} label={label} value={value} />
+      ))}
+    </div>
+  )
+}
+
+function BriefChip({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-xs text-secondary-foreground">
+      <span className="uppercase tracking-[0.24em] text-[0.65rem]">{label}</span>
+      <span className="text-sm font-medium text-foreground">{value}</span>
+    </span>
+  )
+}
+
+function buildImageRequestKey(
+  cocktail: GenerateCocktail,
+  inputs: CocktailInput | null,
+) {
+  return JSON.stringify({
+    name: cocktail.name,
+    description: cocktail.description,
+    garnish: cocktail.garnish,
+    glass: cocktail.glass,
+    tags: cocktail.tags,
+    primaryIngredient: inputs?.primaryIngredient ?? "",
+    theme: inputs?.theme ?? "",
+    cuisine: inputs?.cuisine ?? "",
+    type: inputs?.type ?? "",
+  })
+}
+
+function canGenerateImage(
+  cocktail: Partial<GenerateCocktail> | undefined,
+): cocktail is GenerateCocktail {
+  return Boolean(
+    cocktail &&
+      cocktail.name &&
+      cocktail.description &&
+      Array.isArray(cocktail.ingredients) &&
+      cocktail.ingredients.length > 0 &&
+      cocktail.garnish &&
+      cocktail.glass &&
+      Array.isArray(cocktail.tags) &&
+      cocktail.tags.length > 0,
   )
 }
