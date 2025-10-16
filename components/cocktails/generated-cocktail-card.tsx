@@ -101,19 +101,39 @@ export function GeneratedCocktailCard({
           </div>
         ) : null}
 
-        <ImagePreviewSection
-          status={imageStatus}
-          imageUrl={imageUrl}
-          imageAlt={imageAlt}
-          errorMessage={imageError}
-          onRetry={onRetryImage}
-        />
-
-        {hasGeneratedContent ? (
-          <GeneratedContent cocktail={cocktail} isLoading={isLoading} />
-        ) : isLoading ? (
-          <GeneratedSkeleton />
+        {/* Show cocktail content prominently during generation, feature image when ready */}
+        {hasGeneratedContent || isLoading ? (
+          <div className="space-y-6">
+            {imageStatus === "ready" && imageUrl ? (
+              /* When image is ready, feature it prominently with cocktail below */
+              <>
+                <ImagePreviewSection
+                  status={imageStatus}
+                  imageUrl={imageUrl}
+                  imageAlt={imageAlt}
+                  errorMessage={imageError}
+                  onRetry={onRetryImage}
+                  isSecondary={false}
+                />
+                <GeneratedContent cocktail={cocktail} isLoading={isLoading} />
+              </>
+            ) : (
+              /* During generation, show cocktail prominently with compact image status below */
+              <>
+                <GeneratedContent cocktail={cocktail} isLoading={isLoading} />
+                <ImagePreviewSection
+                  status={imageStatus}
+                  imageUrl={imageUrl}
+                  imageAlt={imageAlt}
+                  errorMessage={imageError}
+                  onRetry={onRetryImage}
+                  isSecondary={true}
+                />
+              </>
+            )}
+          </div>
         ) : (
+          // When no content, show empty state without image
           <EmptyState />
         )}
       </div>
@@ -358,12 +378,14 @@ function ImagePreviewSection({
   imageAlt,
   errorMessage,
   onRetry,
+  isSecondary = false,
 }: {
   status: "idle" | "loading" | "ready" | "error"
   imageUrl?: string
   imageAlt?: string
   errorMessage?: string | null
   onRetry?: () => void
+  isSecondary?: boolean
 }) {
   if (status === "idle") {
     return null
@@ -371,16 +393,16 @@ function ImagePreviewSection({
 
   if (status === "ready" && imageUrl) {
     return (
-      <section className="space-y-3">
-        <SectionHeading>Visual concept</SectionHeading>
-        <figure className="overflow-hidden rounded-2xl border border-border/70 bg-background/90 shadow-inner shadow-black/5">
+      <section className={`space-y-3 ${!isSecondary ? 'ring-2 ring-primary/20 rounded-3xl p-4 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5' : ''}`}>
+        <SectionHeading className={!isSecondary ? 'text-primary font-bold' : ''}>Visual concept</SectionHeading>
+        <figure className={`overflow-hidden ${!isSecondary ? 'rounded-3xl shadow-2xl border-2 border-primary/30' : 'rounded-2xl border border-border/70'} bg-background/90 shadow-inner shadow-black/5`}>
           <img
             src={imageUrl}
             alt={imageAlt ?? "Concept cocktail render"}
             className="aspect-square h-auto w-full object-cover"
           />
-          <figcaption className="border-t border-border/70 bg-background/80 px-4 py-2 text-[0.7rem] font-semibold uppercase tracking-[0.25em] text-muted-foreground/80">
-            Ready for moodboarding
+          <figcaption className={`border-t ${!isSecondary ? 'border-primary/30 bg-primary/10' : 'border-border/70 bg-background/80'} px-4 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.25em] ${!isSecondary ? 'text-primary' : 'text-muted-foreground/80'}`}>
+            {!isSecondary ? '✨ Visual concept ready' : 'Ready for moodboarding'}
           </figcaption>
         </figure>
       </section>
@@ -388,6 +410,22 @@ function ImagePreviewSection({
   }
 
   if (status === "loading") {
+    if (isSecondary) {
+      return (
+        <section className="space-y-3">
+          <SectionHeading>Visual concept</SectionHeading>
+          <div className="rounded-xl border border-border/50 bg-muted/15 p-4 text-center">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/40" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
+              Generating visual concept...
+            </div>
+          </div>
+        </section>
+      )
+    }
     return (
       <section className="space-y-3">
         <SectionHeading>Visual concept</SectionHeading>
@@ -421,21 +459,6 @@ function ImageSkeleton() {
   return (
     <div className="overflow-hidden rounded-2xl border border-border/70 bg-muted/20">
       <div className="aspect-square w-full animate-pulse bg-gradient-to-br from-muted/50 via-muted/20 to-muted/50" />
-    </div>
-  )
-}
-
-function GeneratedSkeleton() {
-  return (
-    <div className="space-y-6">
-      <SkeletonLine className="h-6 w-48" />
-      <div className="space-y-2">
-        <SkeletonLine className="h-3 w-full" />
-        <SkeletonLine className="h-3 w-5/6" />
-        <SkeletonLine className="h-3 w-4/6" />
-      </div>
-      <SkeletonList lines={5} />
-      <SkeletonList lines={3} />
     </div>
   )
 }
@@ -484,9 +507,9 @@ function DetailPill({
   )
 }
 
-function SectionHeading({ children }: { children: ReactNode }) {
+function SectionHeading({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <h4 className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+    <h4 className={cn("text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground", className)}>
       {children}
     </h4>
   )
