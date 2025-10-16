@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import type { CocktailInput, GenerateCocktail } from "@/schemas/cocktailSchemas"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { ChatDialog } from "@/components/ui/chat-dialog"
 import { cn } from "@/lib/utils"
 
 interface GeneratedCocktailCardProps {
@@ -368,6 +369,24 @@ function GeneratedContent({
           </p>
         )}
       </section>
+
+      {/* Chat functionality - only show when cocktail is fully generated */}
+      {!isLoading && cocktail?.name ? (
+        <section className="space-y-3">
+          <Separator className="bg-border/60" />
+          <div className="flex items-center justify-between gap-3">
+            <SectionHeading>Have questions?</SectionHeading>
+            <ChatDialog
+              cocktailName={cocktail.name}
+              cocktailData={cocktail}
+              disabled={isLoading}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Ask about ingredient substitutions, techniques, or flavor profiles.
+          </p>
+        </section>
+      ) : null}
     </div>
   )
 }
