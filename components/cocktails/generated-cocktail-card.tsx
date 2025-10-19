@@ -33,11 +33,11 @@ export function GeneratedCocktailCard({
   onRetryImage,
   onCreateNewCocktail,
 }: GeneratedCocktailCardProps) {
-  const [isBriefExpanded, setIsBriefExpanded] = useState(false)
+  const [isRequestExpanded, setIsRequestExpanded] = useState(false)
 
   useEffect(() => {
     if (inputs) {
-      setIsBriefExpanded(false)
+      setIsRequestExpanded(false)
     }
   }, [inputs])
 
@@ -56,10 +56,10 @@ export function GeneratedCocktailCard({
   return (
     <div className="space-y-6">
       {inputs ? (
-        <CurrentBriefSection
+        <CurrentRequestSection
           inputs={inputs}
-          isExpanded={isBriefExpanded}
-          onToggle={() => setIsBriefExpanded((previous) => !previous)}
+          isExpanded={isRequestExpanded}
+          onToggle={() => setIsRequestExpanded((previous) => !previous)}
           onCreateNewCocktail={onCreateNewCocktail}
         />
       ) : null}
@@ -67,7 +67,7 @@ export function GeneratedCocktailCard({
       <div className="space-y-5 rounded-xl border border-border/70 bg-background/80 p-5 shadow-inner shadow-black/5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-            Generated cocktail
+            Latest build
           </p>
           {isLoading ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -85,9 +85,9 @@ export function GeneratedCocktailCard({
         {isLoading && onStop ? (
           <div className="flex items-center justify-between rounded-lg border border-border/70 bg-secondary/60 px-3 py-2 text-xs text-secondary-foreground">
             <div className="space-y-0.5">
-              <p className="font-medium">Crafting your cocktail</p>
+              <p className="font-medium">Building your cocktail</p>
               <p className="text-[0.7rem] text-secondary-foreground/80">
-                We&apos;ll keep updating this card as new details arrive.
+                We&apos;ll keep polishing this card as new details arrive.
               </p>
             </div>
             <Button
@@ -142,7 +142,7 @@ export function GeneratedCocktailCard({
   )
 }
 
-function CurrentBriefSection({
+function CurrentRequestSection({
   inputs,
   isExpanded,
   onToggle,
@@ -157,7 +157,7 @@ function CurrentBriefSection({
     <section className="rounded-xl border border-border/60 bg-background/80 p-4 shadow-inner shadow-black/5 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-          Current brief
+          Guest request
         </p>
         <div className="flex flex-wrap items-center gap-2">
           {onCreateNewCocktail ? (
@@ -179,7 +179,7 @@ function CurrentBriefSection({
             className="text-xs"
             aria-expanded={isExpanded}
           >
-            {isExpanded ? "Hide details" : "Show details"}
+            {isExpanded ? "Hide specs" : "Show specs"}
           </Button>
         </div>
       </div>
@@ -187,15 +187,15 @@ function CurrentBriefSection({
       {isExpanded ? (
         <>
           <Separator className="my-4 bg-border/60" />
-          <BriefDetails inputs={inputs} />
+          <RequestDetails inputs={inputs} />
         </>
       ) : (
         <>
           <div className="mt-4">
-            <BriefChips inputs={inputs} />
+            <RequestChips inputs={inputs} />
           </div>
           <p className="mt-3 text-[0.7rem] text-muted-foreground">
-            Expand to review or tweak the brief before your next round.
+            Pop this open if you want to fine-tune the guest notes before the next pour.
           </p>
         </>
       )}
@@ -203,11 +203,11 @@ function CurrentBriefSection({
   )
 }
 
-function BriefDetails({ inputs }: { inputs: CocktailInput }) {
+function RequestDetails({ inputs }: { inputs: CocktailInput }) {
   return (
     <dl className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
-      <SummaryItem label="Primary ingredient" value={inputs.primaryIngredient} />
-      <SummaryItem label="Theme" value={inputs.theme} />
+      <SummaryItem label="Base spirit" value={inputs.primaryIngredient} />
+      <SummaryItem label="Mood" value={inputs.theme} />
       {inputs.cuisine ? (
         <SummaryItem label="Cuisine pairing" value={inputs.cuisine} />
       ) : null}
@@ -216,24 +216,24 @@ function BriefDetails({ inputs }: { inputs: CocktailInput }) {
   )
 }
 
-function BriefChips({ inputs }: { inputs: CocktailInput }) {
+function RequestChips({ inputs }: { inputs: CocktailInput }) {
   const chips = [
-    { label: "Ingredient", value: inputs.primaryIngredient },
-    { label: "Theme", value: inputs.theme },
+    { label: "Spirit", value: inputs.primaryIngredient },
+    { label: "Mood", value: inputs.theme },
     ...(inputs.cuisine ? [{ label: "Cuisine", value: inputs.cuisine }] : []),
     { label: "Service", value: formatServiceStyle(inputs.type) },
-  ]
+  ].filter(({ value }) => Boolean(value?.trim?.()))
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       {chips.map(({ label, value }) => (
-        <BriefChip key={`${label}-${value}`} label={label} value={value} />
+        <RequestChip key={`${label}-${value}`} label={label} value={value} />
       ))}
     </div>
   )
 }
 
-function BriefChip({
+function RequestChip({
   label,
   value,
 }: {
@@ -255,12 +255,16 @@ function SummaryItem({
   label: string
   value: string
 }) {
+  const displayValue = value?.trim()
+
   return (
     <div className="space-y-1">
       <dt className="text-[0.7rem] font-semibold uppercase tracking-[0.25em] text-muted-foreground/70">
         {label}
       </dt>
-      <dd className="text-sm text-foreground">{value}</dd>
+      <dd className="text-sm text-foreground">
+        {displayValue ? displayValue : <span className="text-muted-foreground">Not set</span>}
+      </dd>
     </div>
   )
 }
@@ -326,7 +330,7 @@ function GeneratedContent({
           <SkeletonList lines={4} />
         ) : (
           <p className="text-sm text-muted-foreground">
-            We&apos;ll list precise measurements once you generate a cocktail.
+            Measurements will drop in as soon as the build is dialed.
           </p>
         )}
       </section>
@@ -348,7 +352,7 @@ function GeneratedContent({
           <SkeletonList lines={3} />
         ) : (
           <p className="text-sm text-muted-foreground">
-            Steps and technique will stream in here once generation starts.
+            Method details post here the moment we start assembling.
           </p>
         )}
       </section>
@@ -365,7 +369,7 @@ function GeneratedContent({
           <SkeletonList lines={2} />
         ) : (
           <p className="text-sm text-muted-foreground">
-            Use this space for prep notes, batching direction, or story beats.
+            Use this space for prep cues, batching direction, or the story you&apos;ll share at service.
           </p>
         )}
       </section>
@@ -375,7 +379,7 @@ function GeneratedContent({
         <section className="space-y-3">
           <Separator className="bg-border/60" />
           <div className="flex items-center justify-between gap-3">
-            <SectionHeading>Have questions?</SectionHeading>
+            <SectionHeading>Need a second opinion?</SectionHeading>
             <ChatDialog
               cocktailName={cocktail.name}
               cocktailData={cocktail}
@@ -383,7 +387,7 @@ function GeneratedContent({
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Ask about ingredient substitutions, techniques, or flavor profiles.
+            Ask about ingredient swaps, prep timing, or how it plays with your menu.
           </p>
         </section>
       ) : null}
@@ -486,9 +490,9 @@ function EmptyState() {
   return (
     <div className="space-y-3 text-sm text-muted-foreground">
       <p>
-        When you generate a cocktail, we&apos;ll showcase the concept here with ingredients, steps, and finishing notes ready for your team.
+        Once you spin up a cocktail, this panel becomes the playbook—ingredients, build, and finish ready for the team briefing.
       </p>
-      <p>Share the mood, cuisine, and service style to see ideas stream in real time.</p>
+      <p>Drop in the mood, cuisine, and service vibe to watch ideas pour in live.</p>
     </div>
   )
 }
