@@ -465,11 +465,14 @@ export default function HomePage() {
           </span>
           <div className="max-w-2xl space-y-3">
             <h2 className="text-3xl font-semibold sm:text-4xl">
-              Make more of what you already have.
+              Make more with what you already have.
             </h2>
             <p className="text-base text-muted-foreground sm:text-lg">
-              Enter the ingredient you want to feature, the vibe you need to match,
-              and let BarGuru sketch a service-ready idea you can riff on.
+              Enter the ingredient you want to feature, the vibe you need to match, and let
+              BarGuru sketch a service-ready idea you can riff on.
+            </p>
+            <p className="text-sm text-muted-foreground/80">
+              We keep your latest prompt handy so it&apos;s effortless to iterate.
             </p>
           </div>
         </section>

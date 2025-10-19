@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useChat } from "@ai-sdk/react"
 import { Send, MessageCircle, Loader2 } from "lucide-react"
 
 import type { GenerateCocktail } from "@/schemas/cocktailSchemas"
@@ -17,35 +18,49 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
-interface Message {
-  id: string
-  content: string
-  role: "user" | "assistant"
-  timestamp: Date
-}
-
 interface ChatDialogProps {
   cocktailName?: string
-  cocktailData?: Partial<GenerateCocktail> // Will be typed more specifically when we implement the API
+  cocktailData?: Partial<GenerateCocktail>
   disabled?: boolean
 }
 
 export function ChatDialog({ cocktailName, cocktailData, disabled = false }: ChatDialogProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      content: cocktailName
-        ? `Hello! I'm here to answer any questions about your **${cocktailName}** cocktail. What would you like to know?`
-        : "Hello! I'm here to answer any questions about your cocktail. What would you like to know?",
-      role: "assistant",
-      timestamp: new Date(),
-    },
-  ])
-  const [inputValue, setInputValue] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const [input, setInput] = useState("")
+
+  const { messages, sendMessage, status, error } = useChat({
+    onError: (error) => {
+      console.error("Chat error:", error)
+    },
+    onFinish: () => {
+      console.log("Chat finished")
+    },
+  })
+
+  // Send cocktail context with each message
+  const handleSendMessage = (message: string) => {
+    const contextData = {
+      cocktailName,
+      cocktailData: cocktailData ? {
+        name: cocktailData.name,
+        description: cocktailData.description,
+        ingredients: cocktailData.ingredients,
+        instructions: cocktailData.instructions,
+        garnish: cocktailData.garnish,
+        glass: cocktailData.glass,
+        tags: cocktailData.tags,
+        notes: cocktailData.notes,
+      } : undefined,
+    }
+
+    // Send message with context in the body
+    sendMessage({ 'text': message }, {
+      body: contextData
+    })
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -61,38 +76,27 @@ export function ChatDialog({ cocktailName, cocktailData, disabled = false }: Cha
     }
   }, [isOpen])
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: inputValue.trim(),
-      role: "user",
-      timestamp: new Date(),
-    }
-
-    setMessages((prev) => [...prev, userMessage])
-    setInputValue("")
-    setIsLoading(true)
-
-    // Simulate API call - replace with actual implementation
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: `This is a placeholder response for: "${userMessage.content}". When the API is implemented, this will provide detailed answers about your cocktail, including ingredient substitutions, preparation tips, and flavor profile analysis.`,
-        role: "assistant",
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, assistantMessage])
-      setIsLoading(false)
-    }, 1500)
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      handleSendMessage()
+      handleSubmit()
     }
+  }
+
+  const handleSubmit = () => {
+    if (input.trim() && status === "ready") {
+      handleSendMessage(input.trim())
+      setInput("")
+    }
+  }
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    handleSubmit()
   }
 
   return (
@@ -125,6 +129,21 @@ export function ChatDialog({ cocktailName, cocktailData, disabled = false }: Cha
         <div className="flex flex-1 flex-col space-y-4 overflow-hidden">
           <ScrollArea className="flex-1 pr-4">
             <div className="space-y-4">
+              {messages.length === 0 && (
+                <div className="flex justify-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                    <MessageCircle className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="rounded-2xl bg-muted px-4 py-3">
+                    <p className="text-sm">
+                      {cocktailName
+                        ? `Hello! I'm here to answer any questions about your **${cocktailName}** cocktail. What would you like to know?`
+                        : "Hello! I'm here to answer any questions about your cocktail. What would you like to know?"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {messages.map((message) => (
                 <div
                   key={message.id}
@@ -146,14 +165,21 @@ export function ChatDialog({ cocktailName, cocktailData, disabled = false }: Cha
                         : "bg-muted"
                     )}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {message.content}
-                    </p>
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {message.parts.map((part, index) =>
+                        part.type === "text" ? (
+                          <span key={index}>{part.text}</span>
+                        ) : null
+                      )}
+                    </div>
                     <p className="mt-1 text-xs opacity-70">
-                      {message.timestamp.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {new Date(Date.now()).toLocaleTimeString(
+                        [],
+                        {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }
+                      )}
                     </p>
                   </div>
                   {message.role === "user" && (
@@ -166,7 +192,7 @@ export function ChatDialog({ cocktailName, cocktailData, disabled = false }: Cha
                 </div>
               ))}
 
-              {isLoading && (
+              {(status === "streaming" || status === "submitted" || messages.some(m => m.role === "assistant" && m.parts.some(p => p.type === "text" && p.text === ""))) && (
                 <div className="flex justify-start gap-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
                     <MessageCircle className="h-4 w-4 text-primary" />
@@ -179,32 +205,46 @@ export function ChatDialog({ cocktailName, cocktailData, disabled = false }: Cha
                   </div>
                 </div>
               )}
+
+              {error && (
+                <div className="flex justify-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+                    <MessageCircle className="h-4 w-4 text-destructive" />
+                  </div>
+                  <div className="rounded-2xl bg-destructive/10 px-4 py-3">
+                    <p className="text-sm text-destructive">
+                      {error.message || "Something went wrong. Please try again."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
 
-          <div className="flex gap-2">
+          <form onSubmit={onSubmit} className="flex gap-2">
             <Input
               ref={inputRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              value={input}
+              onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder="Ask about ingredients, substitutions, techniques..."
-              disabled={isLoading}
+              disabled={status !== "ready"}
               className="flex-1"
             />
             <Button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
+              type="submit"
+              disabled={!input.trim() || status === 'streaming' || status === 'submitted'}
               size="icon"
             >
-              {isLoading ? (
+              {status === 'submitted' || status === 'streaming' ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Send className="h-4 w-4" />
               )}
             </Button>
-          </div>
+          </form>
         </div>
       </DialogContent>
     </Dialog>
