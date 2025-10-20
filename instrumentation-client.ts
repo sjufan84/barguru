@@ -35,5 +35,6 @@ export function initializeAnalytics() {
   }
 }
 
+
 // Export PostHog for manual event capture
 export { posthog };
