@@ -4,6 +4,16 @@
  */
 
 import posthog from "posthog-js";
+import * as Sentry from '@sentry/nextjs';
+
+Sentry.init({
+  dsn: "https://609b5cebfeafcec3f92006ddfc9110ca@o4510224267804672.ingest.us.sentry.io/4510224312762368",
+  tracesSampleRate: 1.0,
+  enableLogs: true,
+  sendDefaultPii: true,
+});
+
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 
 export function initializeAnalytics() {
   // Initialize PostHog for client-side analytics and feature flags
@@ -18,18 +28,6 @@ export function initializeAnalytics() {
       debug: process.env.NODE_ENV === "development",
       autocapture: false, // Disable autocapture for better control
     });
-
-    // Initialize Sentry client-side if DSN is provided
-    if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
-      import("@sentry/nextjs").then((Sentry) => {
-        Sentry.init({
-          dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-          environment: process.env.NODE_ENV,
-          tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
-          debug: process.env.NODE_ENV === "development",
-        });
-      });
-    }
 
     console.log("✅ Client analytics initialized (PostHog + Sentry)");
   }
