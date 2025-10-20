@@ -28,11 +28,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 BarGuru is an ingredient-first cocktail generation application that allows users to create custom cocktail recipes based on ingredients they have on hand.
 
 **Main Flow:**
-1. User inputs primary ingredient, theme, optional cuisine pairing, and service style
-2. Form data is validated against Zod schemas and sent to `/api/generate-cocktail`
+1. User input form (primary ingredient, theme, optional cuisine, service style)
+2. Form data validated against Zod schemas and sent to `/api/generate-cocktail`
 3. AI generates structured cocktail data using Vercel AI SDK's streaming object generation
-4. Simultaneously, image generation is triggered via `/api/generate-cocktail-image`
-5. Results are displayed in real-time with streaming updates
+4. Simultaneous image generation triggered via `/api/generate-cocktail-image`
+5. Results displayed in real-time with streaming updates
 
 ### Key Directories Structure
 
@@ -45,6 +45,7 @@ BarGuru is an ingredient-first cocktail generation application that allows users
   - `cocktails/` - Cocktail-specific display components
 - `schemas/` - Zod validation schemas
 - `lib/` - Utility functions and configurations
+- `hooks/` - Custom React hooks for state management
 
 ### Schema Architecture
 The application uses a comprehensive schema system:
@@ -82,6 +83,10 @@ The application uses a comprehensive schema system:
 - Complex state management for form data, loading states, and image generation
 - Uses `experimental_useObject` hook for streaming AI responses
 - Responsive design that collapses to single column on mobile
+
+**Key Hooks:**
+- `useCocktailForm` - Manages form state, validation, and submission
+- `useCocktailImage` - Handles image generation with deduplication and abort logic
 
 **GeneratedCocktailCard:**
 - Displays streaming cocktail data with skeleton states
