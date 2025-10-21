@@ -7,6 +7,8 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { CocktailRequestForm } from "@/components/cocktails/cocktail-request-form"
 import { GeneratedCocktailCard } from "@/components/cocktails/generated-cocktail-card"
 import { ModeToggle } from "@/components/themes/mode-toggle"
+import { AuthButton } from "@/components/auth/user-button"
+import { QuotaAlert } from "@/components/cocktails/quota-alert"
 import type { CocktailInput, GenerateCocktail } from "@/schemas/cocktailSchemas"
 import { generateCocktailSchema } from "@/schemas/cocktailSchemas"
 import { useCocktailForm } from "@/hooks/use-cocktail-form"
@@ -15,9 +17,19 @@ import { canGenerateImage } from "@/lib/cocktail-generation"
 
 type NormalizedError = Error | null
 
+interface QuotaExceededResponse {
+  error: string
+  message: string
+  requiresSignUp: boolean
+  usageCount: number
+}
+
 export default function HomePage() {
   const generatedCardRef = useRef<HTMLDivElement>(null)
   const previousIsLoading = useRef(false)
+  const [quotaExceeded, setQuotaExceeded] = useState(false)
+  const [quotaMessage, setQuotaMessage] = useState("")
+  const [usageCount, setUsageCount] = useState(0)
 
   const {
     formState,
@@ -125,6 +137,7 @@ export default function HomePage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setQuotaExceeded(false)
 
     const input = buildSubmissionInput()
     if (!input) {
@@ -138,7 +151,27 @@ export default function HomePage() {
     try {
       await submit(input)
     } catch (submissionError) {
-      console.error("Cocktail generation failed", submissionError)
+      // Check if it's a quota error
+      if (submissionError instanceof Error) {
+        const errorMessage = submissionError.message
+        console.error("Submission error:", errorMessage)
+        
+        // Check if error contains quota exceeded info
+        if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded")) {
+          try {
+            // Try to parse the error response
+            const quotaData = JSON.parse(errorMessage) as QuotaExceededResponse
+            setQuotaExceeded(true)
+            setQuotaMessage(quotaData.message)
+            setUsageCount(quotaData.usageCount)
+          } catch {
+            // If parsing fails, just show the error message
+            setQuotaExceeded(true)
+            setQuotaMessage("You've reached your free quota. Sign up to generate unlimited cocktails!")
+            setUsageCount(1)
+          }
+        }
+      }
     }
   }
 
@@ -161,7 +194,17 @@ export default function HomePage() {
             </h1>
           </div>
           <ModeToggle />
+          <AuthButton />
         </header>
+
+        {quotaExceeded && (
+          <div className="mt-8">
+            <QuotaAlert
+              message={quotaMessage}
+              usageCount={usageCount}
+            />
+          </div>
+        )}
 
         <section className="mt-10 flex flex-col gap-4 sm:mt-14">
           <span className="inline-flex w-max items-center rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-secondary-foreground">

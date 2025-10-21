@@ -2,11 +2,15 @@ import { google } from "@ai-sdk/google"
 import { streamObject } from "ai"
 import { NextResponse } from "next/server"
 import { ZodError } from "zod"
+import { auth } from "@clerk/nextjs/server"
+import { cookies } from "next/headers"
 
 import {
   cocktailInputSchema,
   generateCocktailSchema,
 } from "@/schemas/cocktailSchemas"
+import { checkAnonCocktailQuota, trackCocktailGeneration, getOrCreateUser } from "@/lib/db-utils"
+import { trackServerEvent } from "@/lib/posthog-server"
 
 export const maxDuration = 30
 
@@ -30,6 +34,85 @@ export async function POST(request: Request) {
     )
   }
 
+  // Get or create session ID for anonymous users
+  const cookieStore = await cookies()
+  let sessionId = cookieStore.get("barguru_session_id")?.value
+
+  if (!sessionId) {
+    sessionId = `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    // Note: Cookie will be set in response headers via NextResponse
+  }
+
+  // Get authenticated user if available
+  const { userId: clerkUserId } = await auth()
+
+  let userId: string | null = null
+  let canGenerate = true
+  let quotaMessage = ""
+
+  if (clerkUserId) {
+    // User is authenticated
+    userId = clerkUserId
+    
+    // Get or create user in database
+    // Note: We'll use the user ID and email info from the request
+    // Clerk will sync the full user data via webhook
+    await getOrCreateUser(
+      clerkUserId,
+      "", // Email will be synced via webhook
+      undefined,
+      undefined,
+    )
+
+    // Authenticated users have unlimited access
+    canGenerate = true
+  } else {
+    // Anonymous user - check quota
+    const quota = await checkAnonCocktailQuota(sessionId)
+    canGenerate = quota.canGenerate
+
+    if (!canGenerate) {
+      quotaMessage = `You've reached the limit of free cocktails (${quota.usageCount + 1} attempted). Sign up to create unlimited cocktails!`
+      
+      await trackServerEvent(sessionId, "cocktail_quota_exceeded", {
+        attempt: quota.usageCount + 1,
+        sessionId,
+      })
+
+      // Set session cookie before returning error
+      cookieStore.set("barguru_session_id", sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+      })
+
+      return NextResponse.json(
+        {
+          error: "Quota exceeded",
+          message: quotaMessage,
+          requiresSignUp: true,
+          usageCount: quota.usageCount,
+        },
+        { status: 429 }, // Too Many Requests
+      )
+    }
+  }
+
+  // Track the cocktail generation attempt
+  await trackCocktailGeneration(userId, sessionId)
+
+  // Track event
+  await trackServerEvent(
+    userId || sessionId,
+    "cocktail_generated",
+    {
+      type: parsedInput.type,
+      theme: parsedInput.theme,
+      isAuthenticated: !!userId,
+    },
+  )
+
   const cuisineLine = parsedInput.cuisine
     ? `Cuisine inspiration: ${parsedInput.cuisine}.`
     : "No specific cuisine pairing was requested."
@@ -46,6 +129,16 @@ export async function POST(request: Request) {
     schema: generateCocktailSchema,
     prompt,
   })
+
+  // Set session cookie for anonymous users (using cookies() directly)
+  if (!clerkUserId) {
+    cookieStore.set("barguru_session_id", sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    })
+  }
 
   return result.toTextStreamResponse()
 }
