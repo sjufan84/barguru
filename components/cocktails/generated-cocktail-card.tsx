@@ -1,4 +1,4 @@
-import { Sparkles, Info } from "lucide-react"
+import { Sparkles, Info, Check, AlertCircle } from "lucide-react"
 import { useEffect, useState, type ReactNode, useRef } from "react"
 import Image from "next/image"
 import { useReactToPrint } from "react-to-print"
@@ -22,6 +22,10 @@ interface GeneratedCocktailCardProps {
   imageError?: string | null
   onRetryImage?: () => void
   onCreateNewCocktail?: () => void
+  canSave?: boolean
+  onSaveCocktail?: () => void
+  isSavingCocktail?: boolean
+  saveStatus?: "idle" | "saved" | "error"
 }
 
 export function GeneratedCocktailCard({
@@ -36,6 +40,10 @@ export function GeneratedCocktailCard({
   imageError,
   onRetryImage,
   onCreateNewCocktail,
+  canSave = false,
+  onSaveCocktail,
+  isSavingCocktail = false,
+  saveStatus = "idle",
 }: GeneratedCocktailCardProps) {
   const [isRequestExpanded, setIsRequestExpanded] = useState(false)
   const printRef = useRef<HTMLDivElement>(null)
@@ -92,6 +100,26 @@ export function GeneratedCocktailCard({
                 🖨️ Print Recipe
               </Button>
             ) : null}
+            {canSave && hasGeneratedContent && !isLoading && cocktail?.name ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onSaveCocktail}
+                disabled={isSavingCocktail}
+                className="text-xs"
+              >
+                {saveStatus === "saved" ? (
+                  <span className="flex items-center gap-1">
+                    <Check className="h-3.5 w-3.5" aria-hidden /> Saved
+                  </span>
+                ) : isSavingCocktail ? (
+                  "Saving…"
+                ) : (
+                  "💾 Save to library"
+                )}
+              </Button>
+            ) : null}
             {isLoading ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="relative flex h-2 w-2">
@@ -105,6 +133,12 @@ export function GeneratedCocktailCard({
         </div>
 
         {error ? <ErrorState error={error} /> : null}
+        {saveStatus === "error" ? (
+          <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <AlertCircle className="h-3.5 w-3.5" aria-hidden />
+            Unable to save this cocktail. Try again in a moment.
+          </div>
+        ) : null}
 
         {isLoading && onStop ? (
           <div className="flex items-center justify-between rounded-lg border border-border/70 bg-secondary/60 px-3 py-2 text-xs text-secondary-foreground">

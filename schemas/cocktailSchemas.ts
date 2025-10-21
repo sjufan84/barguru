@@ -44,3 +44,17 @@ export type CocktailInput = z.infer<typeof cocktailInputSchema>
 export type GenerateCocktail = z.infer<typeof generateCocktailSchema>
 export type Cocktail = z.infer<typeof cocktailSchema>
 export type CocktailImageRequest = z.infer<typeof cocktailImageRequestSchema>
+
+export const savedCocktailSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  cocktail: generateCocktailSchema,
+  inputs: cocktailInputSchema.nullable().optional(),
+  imageUrl: z.string().url().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const savedCocktailListSchema = z.array(savedCocktailSchema)
+
+export type SavedCocktail = z.infer<typeof savedCocktailSchema>

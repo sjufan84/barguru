@@ -1,5 +1,15 @@
-import { pgTable, text, serial, timestamp, integer, boolean } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  text,
+  serial,
+  timestamp,
+  integer,
+  boolean,
+  jsonb,
+} from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+
+import type { CocktailInput, GenerateCocktail } from '@/schemas/cocktailSchemas';
 
 /**
  * Users table - stores user information synced from Clerk
@@ -26,7 +36,27 @@ export const cocktailUsage = pgTable('cocktail_usage', {
   usageCount: integer('usage_count').notNull().default(1),
 });
 
+/**
+ * Saved cocktails table - stores generated cocktails saved by authenticated users
+ */
+export const savedCocktails = pgTable('saved_cocktails', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  cocktail: jsonb('cocktail')
+    .$type<GenerateCocktail>()
+    .notNull(),
+  inputs: jsonb('inputs').$type<CocktailInput | null>().default(sql`NULL`),
+  imageUrl: text('image_url'),
+  createdAt: timestamp('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type CocktailUsage = typeof cocktailUsage.$inferSelect;
 export type NewCocktailUsage = typeof cocktailUsage.$inferInsert;
+export type SavedCocktail = typeof savedCocktails.$inferSelect;
+export type NewSavedCocktail = typeof savedCocktails.$inferInsert;

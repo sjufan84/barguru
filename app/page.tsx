@@ -8,15 +8,25 @@ import { useUser } from "@clerk/nextjs"
 
 import { CocktailRequestForm } from "@/components/cocktails/cocktail-request-form"
 import { GeneratedCocktailCard } from "@/components/cocktails/generated-cocktail-card"
+import { SavedCocktailList } from "@/components/cocktails/saved-cocktail-list"
 import { ModeToggle } from "@/components/themes/mode-toggle"
 import { AuthButton } from "@/components/auth/user-button"
 import { QuotaAlert } from "@/components/cocktails/quota-alert"
 import { GuestTrialBanner } from "@/components/cocktails/guest-trial-banner"
-import type { CocktailInput, GenerateCocktail } from "@/schemas/cocktailSchemas"
-import { generateCocktailSchema } from "@/schemas/cocktailSchemas"
+import type { CocktailInput, GenerateCocktail, SavedCocktail } from "@/schemas/cocktailSchemas"
+import {
+  generateCocktailSchema,
+  savedCocktailListSchema,
+  savedCocktailSchema,
+} from "@/schemas/cocktailSchemas"
 import { useCocktailForm } from "@/hooks/use-cocktail-form"
 import { useCocktailImage } from "@/hooks/use-cocktail-image"
 import { canGenerateImage } from "@/lib/cocktail-generation"
+import {
+  ingredientLabelMap,
+  OTHER_INGREDIENT_VALUE,
+} from "@/lib/cocktail-ingredients"
+import type { CocktailFormState } from "@/lib/cocktail-form"
 
 type NormalizedError = Error | null
 
@@ -68,12 +78,27 @@ export default function HomePage() {
     handleFieldChange,
     buildSubmissionInput,
     isSubmissionReady,
+    resetForm,
   } = useCocktailForm()
 
   const [lastSubmittedInputs, setLastSubmittedInputs] =
     useState<CocktailInput | null>(null)
   const [isFormCollapsed, setIsFormCollapsed] = useState(false)
   const [hasUserToggledForm, setHasUserToggledForm] = useState(false)
+  const [savedCocktails, setSavedCocktails] = useState<SavedCocktail[]>([])
+  const [savedCocktailsLoading, setSavedCocktailsLoading] = useState(false)
+  const [selectedSavedCocktailId, setSelectedSavedCocktailId] = useState<number | null>(
+    null,
+  )
+  const selectedSavedCocktailRef = useRef<number | null>(null)
+  const [activeOverride, setActiveOverride] = useState<{
+    cocktail: GenerateCocktail
+    inputs: CocktailInput | null
+    imageUrl?: string | null
+  } | null>(null)
+  const [isSavingCocktail, setIsSavingCocktail] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle")
+  const saveFeedbackTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { imageState, startImageRequest, resetImageState } = useCocktailImage()
 
@@ -86,6 +111,17 @@ export default function HomePage() {
   const normalizedError: NormalizedError =
     error instanceof Error ? error : error ? new Error(String(error)) : null
 
+  useEffect(() => {
+    selectedSavedCocktailRef.current = selectedSavedCocktailId
+  }, [selectedSavedCocktailId])
+
+  const clearSaveFeedback = useCallback(() => {
+    if (saveFeedbackTimeout.current) {
+      clearTimeout(saveFeedbackTimeout.current)
+      saveFeedbackTimeout.current = null
+    }
+  }, [])
+
   const collapseForm = useCallback(() => {
     setIsFormCollapsed(true)
     setHasUserToggledForm(true)
@@ -97,29 +133,168 @@ export default function HomePage() {
   }, [])
 
   const handleCreateNewCocktail = useCallback(() => {
+    clearSaveFeedback()
+    setSaveStatus("idle")
+    setIsSavingCocktail(false)
+    setSelectedSavedCocktailId(null)
+    setActiveOverride(null)
+    setLastSubmittedInputs(null)
+    resetForm()
+    resetImageState()
     resetFormCollapsePreferences()
-  }, [resetFormCollapsePreferences])
+  }, [
+    clearSaveFeedback,
+    resetForm,
+    resetImageState,
+    resetFormCollapsePreferences,
+  ])
 
   const handleRetryImage = useCallback(() => {
-    if (
-      !lastSubmittedInputs ||
-      !canGenerateImage(
-        generatedCocktail as Partial<GenerateCocktail> | undefined,
-      )
-    ) {
+    const targetCocktail =
+      activeOverride?.cocktail ||
+      (generatedCocktail as Partial<GenerateCocktail> | undefined)
+
+    if (!canGenerateImage(targetCocktail)) {
       return
     }
 
-    startImageRequest(
-      generatedCocktail as GenerateCocktail,
-      lastSubmittedInputs,
-      { force: true },
-    )
-  }, [generatedCocktail, lastSubmittedInputs, startImageRequest])
+    const targetInputs = activeOverride?.inputs ?? lastSubmittedInputs ?? null
+
+    startImageRequest(targetCocktail, targetInputs, { force: true })
+  }, [activeOverride, generatedCocktail, lastSubmittedInputs, startImageRequest])
+
+  const handleSelectSavedCocktail = useCallback(
+    (saved: SavedCocktail) => {
+      clearSaveFeedback()
+      setSaveStatus("idle")
+      setIsSavingCocktail(false)
+      setSelectedSavedCocktailId(saved.id)
+      setActiveOverride({
+        cocktail: saved.cocktail,
+        inputs: saved.inputs ?? null,
+        imageUrl: saved.imageUrl ?? null,
+      })
+      setLastSubmittedInputs(saved.inputs ?? null)
+      if (saved.inputs) {
+        resetForm(mapInputToFormState(saved.inputs))
+      } else {
+        resetForm()
+      }
+      setIsFormCollapsed(true)
+      resetImageState()
+    },
+    [
+      clearSaveFeedback,
+      resetForm,
+      resetImageState,
+    ],
+  )
+
+  const handleSaveCocktail = useCallback(async () => {
+    if (!isUserLoaded || !isSignedIn) {
+      return
+    }
+
+    const candidate =
+      activeOverride?.cocktail ||
+      (generatedCocktail as Partial<GenerateCocktail> | undefined)
+
+    const parsedCocktail = generateCocktailSchema.safeParse(candidate)
+    if (!parsedCocktail.success) {
+      setSaveStatus("error")
+      return
+    }
+
+    const inputsToSave = activeOverride?.inputs ?? lastSubmittedInputs ?? null
+    const imageUrlToSave =
+      activeOverride?.imageUrl ??
+      (imageState.status === "ready" ? imageState.url : null)
+
+    clearSaveFeedback()
+    setIsSavingCocktail(true)
+    setSaveStatus("idle")
+
+    try {
+      const response = await fetch("/api/saved-cocktails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cocktail: parsedCocktail.data,
+          inputs: inputsToSave,
+          imageUrl: imageUrlToSave ?? undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to save cocktail: ${response.status}`)
+      }
+
+      const payload = await response.json()
+      const saved = savedCocktailSchema.parse(payload.cocktail ?? payload)
+
+      setSavedCocktails((current) => {
+        const filtered = current.filter((item) => item.id !== saved.id)
+        return [saved, ...filtered]
+      })
+      setSelectedSavedCocktailId(saved.id)
+      if (activeOverride) {
+        setActiveOverride({
+          cocktail: saved.cocktail,
+          inputs: saved.inputs ?? null,
+          imageUrl: saved.imageUrl ?? null,
+        })
+      }
+      setSaveStatus("saved")
+
+      saveFeedbackTimeout.current = setTimeout(() => {
+        setSaveStatus("idle")
+        saveFeedbackTimeout.current = null
+      }, 3000)
+    } catch (saveError) {
+      console.error("Failed to save cocktail", saveError)
+      setSaveStatus("error")
+    } finally {
+      setIsSavingCocktail(false)
+    }
+  }, [
+    activeOverride,
+    clearSaveFeedback,
+    generatedCocktail,
+    imageState.status,
+    imageState.url,
+    isSignedIn,
+    isUserLoaded,
+    lastSubmittedInputs,
+  ])
+
+  const displayedCocktail =
+    activeOverride?.cocktail ??
+    (generatedCocktail as Partial<GenerateCocktail> | undefined)
+  const displayedInputs = activeOverride?.inputs ?? lastSubmittedInputs
+  const cardIsLoading = activeOverride ? false : isLoading
+  const cardImageStatus = activeOverride
+    ? activeOverride.imageUrl
+      ? "ready"
+      : "idle"
+    : imageState.status
+  const cardImageUrl =
+    activeOverride?.imageUrl ??
+    (imageState.status === "ready" ? imageState.url : undefined)
+  const cardImageAlt = activeOverride?.imageUrl
+    ? `Concept image for the ${activeOverride.cocktail.name} cocktail`
+    : imageState.status === "ready"
+      ? imageState.alt
+      : undefined
+  const cardImageError =
+    activeOverride || imageState.status !== "error"
+      ? null
+      : imageState.error ?? null
 
   const isSubmitDisabled = !isSubmissionReady || isLoading
   const shouldHideForm = Boolean(
-    isFormCollapsed && lastSubmittedInputs && !isLoading,
+    isFormCollapsed &&
+      !cardIsLoading &&
+      (displayedInputs || (displayedCocktail && displayedCocktail.name)),
   )
 
   useEffect(() => {
@@ -130,6 +305,75 @@ export default function HomePage() {
       setQuotaMessage(DEFAULT_QUOTA_MESSAGE)
     }
   }, [isSignedIn, isUserLoaded])
+
+  useEffect(() => {
+    return () => {
+      clearSaveFeedback()
+    }
+  }, [clearSaveFeedback])
+
+  useEffect(() => {
+    if (!isUserLoaded) {
+      return
+    }
+
+    if (!isSignedIn) {
+      setSavedCocktails([])
+      setSavedCocktailsLoading(false)
+      setSelectedSavedCocktailId(null)
+      setActiveOverride(null)
+      setSaveStatus("idle")
+      setIsSavingCocktail(false)
+      clearSaveFeedback()
+      return
+    }
+
+    let isCancelled = false
+    setSavedCocktailsLoading(true)
+
+    ;(async () => {
+      try {
+        const response = await fetch("/api/saved-cocktails")
+        if (!response.ok) {
+          throw new Error(`Failed to load saved cocktails: ${response.status}`)
+        }
+
+        const payload = await response.json()
+        const parsed = savedCocktailListSchema.parse(payload.cocktails ?? payload)
+
+        if (!isCancelled) {
+          setSavedCocktails(parsed)
+          const currentSelected = selectedSavedCocktailRef.current
+          if (
+            currentSelected &&
+            !parsed.some((cocktail) => cocktail.id === currentSelected)
+          ) {
+            setSelectedSavedCocktailId(null)
+            setActiveOverride(null)
+            setSaveStatus("idle")
+            clearSaveFeedback()
+          }
+        }
+      } catch (fetchError) {
+        console.error("Failed to fetch saved cocktails", fetchError)
+        if (!isCancelled) {
+          setSavedCocktails([])
+        }
+      } finally {
+        if (!isCancelled) {
+          setSavedCocktailsLoading(false)
+        }
+      }
+    })()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [
+    clearSaveFeedback,
+    isSignedIn,
+    isUserLoaded,
+  ])
 
   useEffect(() => {
     if (
@@ -177,6 +421,11 @@ export default function HomePage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    clearSaveFeedback()
+    setSaveStatus("idle")
+    setIsSavingCocktail(false)
+    setSelectedSavedCocktailId(null)
+    setActiveOverride(null)
     setQuotaExceeded(false)
 
     const input = buildSubmissionInput()
@@ -350,18 +599,32 @@ export default function HomePage() {
           >
             <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_bottom_right,_rgba(196,175,144,0.2),transparent_55%)] dark:bg-[radial-gradient(circle_at_bottom_right,_rgba(84,67,51,0.35),transparent_65%)]" />
             <div className="space-y-6">
+              {isUserLoaded && isSignedIn ? (
+                <SavedCocktailList
+                  cocktails={savedCocktails}
+                  isLoading={savedCocktailsLoading}
+                  onSelect={handleSelectSavedCocktail}
+                  selectedId={selectedSavedCocktailId}
+                />
+              ) : null}
               <GeneratedCocktailCard
-                cocktail={generatedCocktail as Partial<GenerateCocktail> | undefined}
-                inputs={lastSubmittedInputs}
-                isLoading={isLoading}
+                cocktail={displayedCocktail}
+                inputs={displayedInputs}
+                isLoading={cardIsLoading}
                 onStop={stop}
-                error={normalizedError}
-                imageStatus={imageState.status}
-                imageUrl={imageState.status === "ready" ? imageState.url : undefined}
-                imageAlt={imageState.status === "ready" ? imageState.alt : undefined}
-                imageError={imageState.status === "error" ? imageState.error : null}
+                error={activeOverride ? null : normalizedError}
+                imageStatus={cardImageStatus}
+                imageUrl={cardImageUrl}
+                imageAlt={cardImageAlt}
+                imageError={cardImageError}
                 onRetryImage={handleRetryImage}
                 onCreateNewCocktail={handleCreateNewCocktail}
+                canSave={Boolean(isUserLoaded && isSignedIn)}
+                onSaveCocktail={
+                  isUserLoaded && isSignedIn ? handleSaveCocktail : undefined
+                }
+                isSavingCocktail={isSavingCocktail}
+                saveStatus={saveStatus}
               />
               {isUserLoaded && !isSignedIn && guestUsageCount > 0 ? (
                 <GuestTrialBanner
@@ -378,4 +641,21 @@ export default function HomePage() {
       </div>
     </main>
   )
+}
+
+function mapInputToFormState(input: CocktailInput): CocktailFormState {
+  const normalizedIngredient = input.primaryIngredient.trim()
+  const matchedEntry = Object.entries(ingredientLabelMap).find(
+    ([, label]) => label.toLowerCase() === normalizedIngredient.toLowerCase(),
+  )
+
+  return {
+    primaryIngredientSelection: matchedEntry
+      ? matchedEntry[0]
+      : OTHER_INGREDIENT_VALUE,
+    primaryIngredientCustom: matchedEntry ? "" : normalizedIngredient,
+    theme: input.theme,
+    cuisine: input.cuisine ?? "",
+    type: input.type,
+  }
 }

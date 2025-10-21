@@ -1,7 +1,36 @@
 import { Webhook } from 'svix';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { getOrCreateUser, updateUserPremiumStatus } from '@/lib/db-utils';
+import { getOrCreateUser } from '@/lib/db-utils';
+
+type ClerkEmailAddress = { email_address?: string };
+
+type ClerkWebhookEvent = {
+  type: string;
+  data: {
+    id?: string;
+    email_addresses?: ClerkEmailAddress[];
+    first_name?: string | null;
+    last_name?: string | null;
+  };
+};
+
+function isClerkWebhookEvent(value: unknown): value is ClerkWebhookEvent {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const event = value as Partial<ClerkWebhookEvent>;
+  if (typeof event.type !== 'string') {
+    return false;
+  }
+
+  if (typeof event.data !== 'object' || event.data === null) {
+    return false;
+  }
+
+  return true;
+}
 
 export async function POST(req: Request) {
   // You can find this in the Clerk Dashboard -> Webhooks -> choose the endpoint
@@ -30,7 +59,7 @@ export async function POST(req: Request) {
   // Create a new Svix instance with your secret.
   const wh = new Webhook(WEBHOOK_SECRET);
 
-  let evt: any;
+  let evt: unknown;
 
   // Verify the payload
   // Using the 'svix' library to verify is easier than doing it manually
@@ -41,11 +70,17 @@ export async function POST(req: Request) {
       'svix-timestamp': svix_timestamp,
       'svix-signature': svix_signature,
     });
-  } catch (err: any) {
-    console.error('Error verifying webhook:', err.message);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('Error verifying webhook:', message);
     return new NextResponse('Error occurred', {
       status: 400,
     });
+  }
+
+  if (!isClerkWebhookEvent(evt)) {
+    console.error('Invalid webhook payload received');
+    return new NextResponse('Invalid payload', { status: 400 });
   }
 
   // Get the ID and type

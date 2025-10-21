@@ -1,6 +1,8 @@
 import { db } from '@/lib/db';
-import { users, cocktailUsage } from '@/lib/db.schema';
-import { eq, and } from 'drizzle-orm';
+import { users, cocktailUsage, savedCocktails } from '@/lib/db.schema';
+import { eq, and, desc } from 'drizzle-orm';
+
+import type { CocktailInput, GenerateCocktail } from '@/schemas/cocktailSchemas';
 
 const ANON_COCKTAIL_LIMIT = 1; // Non-members can create 1 cocktail
 
@@ -113,4 +115,34 @@ export async function getUserCocktailCount(userId: string): Promise<number> {
     .where(eq(cocktailUsage.userId, userId));
 
   return records.length;
+}
+
+export async function saveCocktailForUser(
+  userId: string,
+  payload: {
+    cocktail: GenerateCocktail;
+    inputs: CocktailInput | null;
+    imageUrl?: string | null;
+  },
+) {
+  const [record] = await db
+    .insert(savedCocktails)
+    .values({
+      userId,
+      name: payload.cocktail.name,
+      cocktail: payload.cocktail,
+      inputs: payload.inputs,
+      imageUrl: payload.imageUrl ?? null,
+    })
+    .returning();
+
+  return record;
+}
+
+export async function getSavedCocktailsForUser(userId: string) {
+  return await db
+    .select()
+    .from(savedCocktails)
+    .where(eq(savedCocktails.userId, userId))
+    .orderBy(desc(savedCocktails.createdAt));
 }
