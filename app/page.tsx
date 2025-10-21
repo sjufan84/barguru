@@ -32,6 +32,24 @@ const GUEST_COCKTAIL_LIMIT = 1
 const DEFAULT_QUOTA_MESSAGE =
   "Your complimentary cocktail has been poured. Sign up with Clerk to craft unlimited menus."
 
+const HERO_STEPS = [
+  {
+    title: "Set the brief",
+    description:
+      "Pick a hero ingredient and describe the moment or guest you&apos;re serving so we can dial in the direction.",
+  },
+  {
+    title: "Preview instantly",
+    description:
+      "BarGuru drafts a full spec—ingredients, method, garnish, and image concept—in a card you can tweak live.",
+  },
+  {
+    title: "Share with the team",
+    description:
+      "Print, chat through adjustments, or spin up a variation without retyping your last request.",
+  },
+]
+
 export default function HomePage() {
   const { isLoaded: isUserLoaded, isSignedIn } = useUser()
   const generatedCardRef = useRef<HTMLDivElement>(null)
@@ -244,15 +262,17 @@ export default function HomePage() {
       <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 pb-16 pt-12 sm:px-8 lg:px-12">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-[0.35em] text-muted-foreground">
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground">
               BarGuru
             </p>
             <h1 className="text-xl font-semibold sm:text-2xl">
-              Ingredient-first cocktail studio
+              Service-ready cocktail intelligence
             </h1>
           </div>
-          <ModeToggle />
-          <AuthButton />
+          <div className="flex items-center gap-3">
+            <ModeToggle />
+            <AuthButton />
+          </div>
         </header>
 
         {quotaExceeded && (
@@ -265,22 +285,45 @@ export default function HomePage() {
           </div>
         )}
 
-        <section className="mt-10 flex flex-col gap-4 sm:mt-14">
-          <span className="inline-flex w-max items-center rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-secondary-foreground">
-            Jump right in
-          </span>
-          <div className="max-w-2xl space-y-3">
-            <h2 className="text-3xl font-semibold sm:text-4xl">
-              Make more with what you already have.
-            </h2>
-            <p className="text-base text-muted-foreground sm:text-lg">
-              Enter the ingredient you want to feature, the vibe you need to match, and let
-              BarGuru sketch a service-ready idea you can riff on.
-            </p>
-            <p className="text-sm text-muted-foreground/80">
-              We keep your latest prompt handy so it&apos;s effortless to iterate.
-            </p>
+        <section className="mt-12 space-y-8 sm:mt-16">
+          <div className="space-y-4">
+            <span className="inline-flex w-max items-center rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-secondary-foreground">
+              Ingredient-first workflow
+            </span>
+            <div className="space-y-4">
+              <h2 className="max-w-3xl text-4xl font-semibold leading-tight sm:text-5xl">
+                Design bar-ready cocktails in minutes.
+              </h2>
+              <p className="max-w-3xl text-base text-muted-foreground sm:text-lg">
+                BarGuru turns surplus produce and half-bottles into polished concepts. Describe the vibe, and we&apos;ll draft measurements, prep notes, and a visual direction while you watch.
+              </p>
+              <p className="text-sm text-muted-foreground/80">
+                Your last prompt stays pinned so iterating on a build or spinning up a variation is effortless.
+              </p>
+            </div>
           </div>
+
+          <ol className="grid gap-4 rounded-3xl border border-border/60 bg-card/80 p-5 sm:grid-cols-3 sm:p-6">
+            {HERO_STEPS.map((step, index) => (
+              <li key={step.title} className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                    {index + 1}
+                  </span>
+                  <span className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+                    {step.title}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">{step.description}</p>
+              </li>
+            ))}
+          </ol>
+
+          {isUserLoaded && !isSignedIn ? (
+            <p className="text-sm text-muted-foreground">
+              Your first cocktail is on the house. Sign up to save every card, collaborate with your team, and unlock unlimited generations.
+            </p>
+          ) : null}
         </section>
 
         <div
@@ -328,8 +371,7 @@ export default function HomePage() {
               ) : null}
             </div>
             <div className="mt-8 rounded-xl border border-border/60 bg-secondary/60 p-4 text-xs text-secondary-foreground">
-              Tip: try contrasting inputs like &quot;charred citrus&quot; with &quot;after-dinner&quot; to
-              stretch your menu in fresh directions.
+              Tip: Combine a clear mood with a specific service style to help BarGuru fine-tune dilution, temperature, and finishing touches.
             </div>
           </aside>
         </div>

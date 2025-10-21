@@ -1,4 +1,5 @@
-import type { FormEvent } from "react"
+import { ChevronDown } from "lucide-react"
+import type { FormEvent, ReactNode } from "react"
 
 import type { CocktailInput } from "@/schemas/cocktailSchemas"
 
@@ -97,148 +98,215 @@ export function CocktailRequestForm({
         </div>
       ) : null}
 
-      <fieldset aria-disabled={isLoading} className="grid gap-6" disabled={isLoading}>
-        <div className="space-y-2">
-          <Label htmlFor="primaryIngredientSelection">Primary ingredient</Label>
-          <div className="relative">
-            <select
-              id="primaryIngredientSelection"
-              name="primaryIngredientSelection"
-              value={formState.primaryIngredientSelection}
-              onChange={(event) =>
-                onFieldChange("primaryIngredientSelection", event.target.value)
-              }
-              className="h-11 w-full appearance-none rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-invalid={Boolean(formErrors.primaryIngredientSelection)}
-              aria-describedby={
-                formErrors.primaryIngredientSelection
-                  ? "primaryIngredientSelection-error"
-                  : undefined
-              }
-            >
-              <option value="">Select an ingredient</option>
-              {ingredientCategories.map((category) => (
-                <optgroup key={category} label={category}>
-                  {ingredientOptions
-                    .filter((option) => option.category === category)
-                    .map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                </optgroup>
-              ))}
-              <option value={OTHER_INGREDIENT_VALUE}>Other (specify)</option>
-            </select>
-            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted-foreground">
-              v
-            </span>
-          </div>
-          {formErrors.primaryIngredientSelection ? (
-            <p
-              id="primaryIngredientSelection-error"
-              className="text-sm text-destructive"
-            >
-              {formErrors.primaryIngredientSelection}
-            </p>
-          ) : null}
-        </div>
+      <p className="mb-6 text-sm text-muted-foreground">
+        Guide us through the build: choose a hero ingredient, set the mood, then add any service specifics. Everything except cuisine is required.
+      </p>
 
-        {formState.primaryIngredientSelection === OTHER_INGREDIENT_VALUE ? (
+      <fieldset aria-disabled={isLoading} className="grid gap-6" disabled={isLoading}>
+        <FormSection
+          step={1}
+          title="Choose your hero ingredient"
+          description="Pick the spirit or element you want to spotlight so we can pair flavors that complement it."
+        >
           <div className="space-y-2">
-            <Label htmlFor="primaryIngredientCustom">Custom ingredient</Label>
-            <Input
-              id="primaryIngredientCustom"
-              name="primaryIngredientCustom"
-              placeholder="e.g. roasted pineapple shrub"
-              value={formState.primaryIngredientCustom}
-              onChange={(event) =>
-                onFieldChange("primaryIngredientCustom", event.target.value)
-              }
-              aria-invalid={Boolean(formErrors.primaryIngredientCustom)}
-              aria-describedby={
-                formErrors.primaryIngredientCustom
-                  ? "primaryIngredientCustom-error"
-                  : undefined
-              }
-            />
-            {formErrors.primaryIngredientCustom ? (
+            <Label htmlFor="primaryIngredientSelection">Primary ingredient</Label>
+            <div className="relative">
+              <select
+                id="primaryIngredientSelection"
+                name="primaryIngredientSelection"
+                value={formState.primaryIngredientSelection}
+                onChange={(event) =>
+                  onFieldChange("primaryIngredientSelection", event.target.value)
+                }
+                className="h-11 w-full appearance-none rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-invalid={Boolean(formErrors.primaryIngredientSelection)}
+                aria-describedby={
+                  formErrors.primaryIngredientSelection
+                    ? "primaryIngredientSelection-error"
+                    : undefined
+                }
+              >
+                <option value="">Select an ingredient</option>
+                {ingredientCategories.map((category) => (
+                  <optgroup key={category} label={category}>
+                    {ingredientOptions
+                      .filter((option) => option.category === category)
+                      .map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))}
+                <option value={OTHER_INGREDIENT_VALUE}>Other (specify)</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute inset-y-0 right-3 my-auto h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Unsure where it fits? Choose “Other” and describe the ingredient or prep you have ready.
+            </p>
+            {formErrors.primaryIngredientSelection ? (
               <p
-                id="primaryIngredientCustom-error"
+                id="primaryIngredientSelection-error"
                 className="text-sm text-destructive"
               >
-                {formErrors.primaryIngredientCustom}
+                {formErrors.primaryIngredientSelection}
               </p>
             ) : null}
           </div>
-        ) : null}
 
-        <div className="space-y-2">
-          <Label htmlFor="theme">Mood or theme</Label>
-          <Input
-            id="theme"
-            name="theme"
-            placeholder="e.g. tropical sunset, spirit-forward"
-            value={formState.theme}
-            onChange={(event) => onFieldChange("theme", event.target.value)}
-            aria-invalid={Boolean(formErrors.theme)}
-            aria-describedby={formErrors.theme ? "theme-error" : undefined}
-          />
-          {formErrors.theme ? (
-            <p id="theme-error" className="text-sm text-destructive">
-              {formErrors.theme}
-            </p>
+          {formState.primaryIngredientSelection === OTHER_INGREDIENT_VALUE ? (
+            <div className="space-y-2">
+              <Label htmlFor="primaryIngredientCustom">Custom ingredient</Label>
+              <Input
+                id="primaryIngredientCustom"
+                name="primaryIngredientCustom"
+                placeholder="e.g. roasted pineapple shrub"
+                value={formState.primaryIngredientCustom}
+                onChange={(event) =>
+                  onFieldChange("primaryIngredientCustom", event.target.value)
+                }
+                aria-invalid={Boolean(formErrors.primaryIngredientCustom)}
+                aria-describedby={
+                  formErrors.primaryIngredientCustom
+                    ? "primaryIngredientCustom-error"
+                    : undefined
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Be as specific as you like—include prep style, infusions, or finishing notes.
+              </p>
+              {formErrors.primaryIngredientCustom ? (
+                <p
+                  id="primaryIngredientCustom-error"
+                  className="text-sm text-destructive"
+                >
+                  {formErrors.primaryIngredientCustom}
+                </p>
+              ) : null}
+            </div>
           ) : null}
-        </div>
+        </FormSection>
 
-        <div className="space-y-2">
-          <Label htmlFor="cuisine">
-            Cuisine pairing <span className="text-muted-foreground">(optional)</span>
-          </Label>
-          <Input
-            id="cuisine"
-            name="cuisine"
-            placeholder="e.g. coastal Mexican, late-night snacks"
-            value={formState.cuisine ?? ""}
-            onChange={(event) => onFieldChange("cuisine", event.target.value)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="type">Service style</Label>
-          <div className="relative">
-            <select
-              id="type"
-              name="type"
-              value={formState.type}
-              onChange={(event) =>
-                onFieldChange("type", event.target.value as CocktailInput["type"])
-              }
-              className="h-11 w-full appearance-none rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {typeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted-foreground">
-              v
-            </span>
+        <FormSection
+          step={2}
+          title="Set the vibe"
+          description="Tell us the mood, occasion, or guest you&apos;re designing for so we can match the energy."
+        >
+          <div className="space-y-2">
+            <Label htmlFor="theme">Mood or theme</Label>
+            <Input
+              id="theme"
+              name="theme"
+              placeholder="e.g. tropical sunset, spirit-forward"
+              value={formState.theme}
+              onChange={(event) => onFieldChange("theme", event.target.value)}
+              aria-invalid={Boolean(formErrors.theme)}
+              aria-describedby={formErrors.theme ? "theme-error" : undefined}
+            />
+            <p className="text-xs text-muted-foreground">
+              Include any flavor cues, guest personas, or service moments (pre-dinner, low ABV, celebratory, etc.).
+            </p>
+            {formErrors.theme ? (
+              <p id="theme-error" className="text-sm text-destructive">
+                {formErrors.theme}
+              </p>
+            ) : null}
           </div>
-        </div>
+        </FormSection>
+
+        <FormSection
+          step={3}
+          title="Dial in the service details"
+          description="Optional extras help us tailor glassware and prep to your program."
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="cuisine">
+                Cuisine pairing <span className="text-muted-foreground">(optional)</span>
+              </Label>
+              <Input
+                id="cuisine"
+                name="cuisine"
+                placeholder="e.g. coastal Mexican, late-night snacks"
+                value={formState.cuisine ?? ""}
+                onChange={(event) => onFieldChange("cuisine", event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Useful for pairing menus or service moments tied to food.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="type">Service style</Label>
+              <div className="relative">
+                <select
+                  id="type"
+                  name="type"
+                  value={formState.type}
+                  onChange={(event) =>
+                    onFieldChange("type", event.target.value as CocktailInput["type"])
+                  }
+                  className="h-11 w-full appearance-none rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {typeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute inset-y-0 right-3 my-auto h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Choose how it will be presented at service to match dilution and build recommendations.
+              </p>
+            </div>
+          </div>
+        </FormSection>
       </fieldset>
 
       <Separator className="my-6 bg-border/80" />
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
-          We will turn this prompt into a spec draft you can share with the team.
+          We&apos;ll turn this brief into a spec draft, complete with ingredients, method, and talking points.
         </p>
-        <Button type="submit" disabled={isSubmitDisabled} className="min-w-[10rem]">
-          {isLoading ? "Gathering ideas..." : "Generate cocktail"}
+        <Button type="submit" disabled={isSubmitDisabled} className="min-w-[11rem] rounded-full">
+          {isLoading ? "Gathering ideas..." : "Generate cocktail card"}
         </Button>
       </div>
     </form>
+  )
+}
+
+function FormSection({
+  step,
+  title,
+  description,
+  children,
+}: {
+  step: number
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <section className="space-y-4 rounded-2xl border border-border/60 bg-background/85 p-5 shadow-inner shadow-black/5">
+      <header className="space-y-2">
+        <div className="flex items-start gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+            {step}
+          </span>
+          <div className="space-y-1">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+              Step {step}
+            </p>
+            <h2 className="text-base font-semibold text-foreground sm:text-lg">{title}</h2>
+          </div>
+        </div>
+        <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+      </header>
+      <div className="space-y-4">{children}</div>
+    </section>
   )
 }

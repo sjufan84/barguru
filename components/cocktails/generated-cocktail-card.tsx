@@ -1,3 +1,4 @@
+import { Sparkles, Info } from "lucide-react"
 import { useEffect, useState, type ReactNode, useRef } from "react"
 import Image from "next/image"
 import { useReactToPrint } from "react-to-print"
@@ -61,6 +62,7 @@ export function GeneratedCocktailCard({
         cocktail.glass ||
         cocktail.notes),
   )
+  const showEmptyState = !hasGeneratedContent && !isLoading
 
   return (
     <div className="space-y-6">
@@ -125,11 +127,14 @@ export function GeneratedCocktailCard({
         ) : null}
 
         <div ref={printRef} className="print-content">
-          {/* Show cocktail content prominently during generation, feature image when ready */}
-          {hasGeneratedContent || isLoading ? (
+          {showEmptyState ? (
+            <EmptyState
+              hasRequest={Boolean(inputs)}
+              onCreateNewCocktail={onCreateNewCocktail}
+            />
+          ) : (
             <div className="space-y-6">
               {imageStatus === "ready" && imageUrl ? (
-                /* When image is ready, feature it prominently with cocktail below */
                 <>
                   <ImagePreviewSection
                     status={imageStatus}
@@ -142,7 +147,6 @@ export function GeneratedCocktailCard({
                   <GeneratedContent cocktail={cocktail} isLoading={isLoading} />
                 </>
               ) : (
-                /* During generation, show cocktail prominently with compact image status below */
                 <>
                   <GeneratedContent cocktail={cocktail} isLoading={isLoading} />
                   <ImagePreviewSection
@@ -152,13 +156,11 @@ export function GeneratedCocktailCard({
                     errorMessage={imageError}
                     onRetry={onRetryImage}
                     isSecondary={true}
+                    showIdleHelper
                   />
                 </>
               )}
             </div>
-          ) : (
-            // When no content, show empty state without image
-            <EmptyState />
           )}
         </div>
       </div>
@@ -178,11 +180,16 @@ function CurrentRequestSection({
   onCreateNewCocktail?: () => void
 }) {
   return (
-    <section className="rounded-xl border border-border/60 bg-background/80 p-4 shadow-inner shadow-black/5 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-          Guest request
-        </p>
+    <section className="space-y-4 rounded-2xl border border-border/60 bg-background/85 p-5 shadow-inner shadow-black/5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+            Your latest brief
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Review the essentials or pop it open to tweak the details before pouring again.
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           {onCreateNewCocktail ? (
             <Button
@@ -190,9 +197,9 @@ function CurrentRequestSection({
               variant="outline"
               size="sm"
               onClick={onCreateNewCocktail}
-              className="text-xs"
+              className="rounded-full text-xs"
             >
-              New cocktail
+              Start fresh
             </Button>
           ) : null}
           <Button
@@ -200,7 +207,7 @@ function CurrentRequestSection({
             variant="ghost"
             size="sm"
             onClick={onToggle}
-            className="text-xs"
+            className="rounded-full text-xs"
             aria-expanded={isExpanded}
           >
             {isExpanded ? "Hide specs" : "Show specs"}
@@ -210,16 +217,14 @@ function CurrentRequestSection({
 
       {isExpanded ? (
         <>
-          <Separator className="my-4 bg-border/60" />
+          <Separator className="bg-border/60" />
           <RequestDetails inputs={inputs} />
         </>
       ) : (
         <>
-          <div className="mt-4">
-            <RequestChips inputs={inputs} />
-          </div>
-          <p className="mt-3 text-[0.7rem] text-muted-foreground">
-            Pop this open if you want to fine-tune the guest notes before the next pour.
+          <RequestChips inputs={inputs} />
+          <p className="text-[0.7rem] text-muted-foreground">
+            Need to adjust something? Expand for the full rundown of your request.
           </p>
         </>
       )}
@@ -257,17 +262,13 @@ function RequestChips({ inputs }: { inputs: CocktailInput }) {
   )
 }
 
-function RequestChip({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
+function RequestChip({ label, value }: { label: string; value: string }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-xs text-secondary-foreground">
-      <span className="uppercase tracking-[0.24em] text-[0.65rem]">{label}</span>
-      <span className="text-sm font-medium text-foreground">{value}</span>
+    <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-secondary/70 px-3 py-1.5 text-xs text-secondary-foreground shadow-sm">
+      <span className="uppercase tracking-[0.24em] text-[0.65rem] text-secondary-foreground/70">
+        {label}
+      </span>
+      <span className="text-sm font-semibold text-foreground">{value}</span>
     </span>
   )
 }
@@ -442,6 +443,7 @@ function ImagePreviewSection({
   errorMessage,
   onRetry,
   isSecondary = false,
+  showIdleHelper = false,
 }: {
   status: "idle" | "loading" | "ready" | "error"
   imageUrl?: string
@@ -449,9 +451,21 @@ function ImagePreviewSection({
   errorMessage?: string | null
   onRetry?: () => void
   isSecondary?: boolean
+  showIdleHelper?: boolean
 }) {
   if (status === "idle") {
-    return null
+    if (!showIdleHelper) {
+      return null
+    }
+
+    return (
+      <section className="space-y-3 rounded-2xl border border-dashed border-border/60 bg-background/70 p-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <Info className="h-4 w-4" aria-hidden="true" />
+          <span>We&apos;ll queue a concept render as soon as you generate a cocktail.</span>
+        </div>
+      </section>
+    )
   }
 
   if (status === "ready" && imageUrl) {
@@ -510,7 +524,7 @@ function ImagePreviewSection({
             variant="outline"
             size="sm"
             onClick={onRetry}
-            className="border-destructive/40 text-destructive hover:text-destructive"
+            className="rounded-full border-destructive/40 text-destructive hover:text-destructive"
           >
             Try again
           </Button>
@@ -528,13 +542,55 @@ function ImageSkeleton() {
   )
 }
 
-function EmptyState() {
+function EmptyState({
+  hasRequest,
+  onCreateNewCocktail,
+}: {
+  hasRequest: boolean
+  onCreateNewCocktail?: () => void
+}) {
   return (
-    <div className="space-y-3 text-sm text-muted-foreground">
-      <p>
-        Once you spin up a cocktail, this panel becomes the playbook—ingredients, build, and finish ready for the team briefing.
-      </p>
-      <p>Drop in the mood, cuisine, and service vibe to watch ideas pour in live.</p>
+    <div className="space-y-5 rounded-2xl border border-dashed border-border/60 bg-background/70 p-6 text-sm text-muted-foreground">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Sparkles className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-base font-semibold text-foreground">
+            Waiting for your first pour
+          </h3>
+          <p>
+            Fill out the brief on the left and we&apos;ll drop the full cocktail spec—ingredients, build, garnish, and image concept—right here.
+          </p>
+        </div>
+      </div>
+
+      <ul className="space-y-2 text-xs">
+        <li className="flex items-start gap-2">
+          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary/60" aria-hidden />
+          <span>Start with a hero ingredient and the mood you&apos;re aiming for.</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary/60" aria-hidden />
+          <span>Optional service notes help us lock in glassware, prep, and pairings.</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary/60" aria-hidden />
+          <span>Once generated, you can print, chat about tweaks, or start another round instantly.</span>
+        </li>
+      </ul>
+
+      {onCreateNewCocktail ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onCreateNewCocktail}
+          className="rounded-full"
+        >
+          {hasRequest ? "Clear brief" : "Start a brief"}
+        </Button>
+      ) : null}
     </div>
   )
 }
