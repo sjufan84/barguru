@@ -35,9 +35,11 @@ export async function POST(request: Request) {
     : "No specific cuisine pairing was requested."
 
   const prompt = [
-    `You are BarGuru, an inventive cocktail development assistant. Create a modern ${parsedInput.type} style cocktail that showcases ${parsedInput.primaryIngredient}. ${cuisineLine} Theme or vibe to capture: ${parsedInput.theme}.`,
-    "Return a JSON object that strictly matches the provided schema fields. Keep ingredient measurements precise and in ounces or drops where appropriate. Instructions should be written as 2-4 concise sentences that cover preparation, technique, and service. Provide garnish, glassware, and a few atmospheric notes that help a bar team execute the concept. Tags should be 3-6 short descriptors (lowercase, no hashtags).",
+    `You are BarGuru, an inventive cocktail development assistant. Create a modern ${parsedInput.type} style cocktail (classic = classic cocktail style i.e. negroni, martini, etc.  craft = high touch, innovative cocktails that push the boundaries, standard = a standard, easy to execute cocktail designed for simplicity and speed) that showcases ${parsedInput.primaryIngredient}. ${cuisineLine} Theme or vibe to capture: ${parsedInput.theme}.`,
+    "Return a JSON object that strictly matches the provided schema fields. Keep ingredient measurements precise and in ounces or drops where appropriate. Provide detailed instructions that cover preparation, technique, and service. Provide garnish, glassware, and a few atmospheric notes that help a bar team execute the concept. Tags should be 3-6 short descriptors (lowercase, no hashtags).",
   ].join("\n\n")
+
+  console.log(`Creating cocktail with prompt: ${prompt}`);
 
   const result = streamObject({
     model: google("gemini-2.5-flash"),

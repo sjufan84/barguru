@@ -23,7 +23,7 @@ export const generateCocktailSchema = z.object({
       "The description of the cocktail.  Should be a short description of the cocktail.",
     ),
   ingredients: z.array(z.string()).describe("The ingredients of the cocktail."),
-  instructions: z.string().describe("The instructions to make the cocktail."),
+  instructions: z.array(z.string()).describe("The instructions to make the cocktail."),
   tags: z.array(z.string()).describe("The tags of the cocktail."),
   garnish: z.string().describe("The garnish of the cocktail."),
   glass: z.string().describe("The glass to serve the cocktail in."),

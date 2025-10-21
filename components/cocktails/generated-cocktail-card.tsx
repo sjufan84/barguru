@@ -1,4 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react"
+import Image from "next/image"
+import ReactMarkdown from "react-markdown"
 
 import type { CocktailInput, GenerateCocktail } from "@/schemas/cocktailSchemas"
 import { Button } from "@/components/ui/button"
@@ -278,17 +280,16 @@ function GeneratedContent({
 }) {
   const ingredients = cocktail?.ingredients ?? []
   const tags = cocktail?.tags ?? []
-  const instructionLines = splitLines(cocktail?.instructions)
   const notesLines = splitLines(cocktail?.notes)
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h3 className="text-2xl font-semibold text-primary">
+      <div className="space-y-3">
+        <h3 className="text-3xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
           {cocktail?.name ?? (isLoading ? <SkeletonLine className="h-7 w-40" /> : "")}
         </h3>
         {cocktail?.description ? (
-          <p className="text-sm text-muted-foreground">{cocktail.description}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground max-w-2xl">{cocktail.description}</p>
         ) : isLoading ? (
           <div className="space-y-2">
             <SkeletonLine className="h-3 w-full" />
@@ -302,7 +303,7 @@ function GeneratedContent({
           {tags.map((tag, index) => (
             <span
               key={`${tag}-${index}`}
-              className="inline-flex items-center rounded-full bg-secondary px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-secondary-foreground"
+              className="inline-flex items-center rounded-full bg-gradient-to-r from-secondary/60 to-secondary/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-secondary-foreground border border-secondary/40 backdrop-blur-sm hover:shadow-md hover:shadow-secondary/30 transition-all"
             >
               {tag}
             </span>
@@ -318,14 +319,16 @@ function GeneratedContent({
       <section className="space-y-3">
         <SectionHeading>Ingredients</SectionHeading>
         {ingredients.length > 0 ? (
-          <ul className="space-y-2 text-sm">
-            {ingredients.map((item, index) => (
-              <li key={`${item}-${index}`} className="flex gap-2">
-                <span className="mt-[0.35rem] h-1.5 w-1.5 rounded-full bg-primary/70" aria-hidden />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="rounded-lg border border-border/50 bg-background/60 p-4">
+            <ul className="space-y-2.5 text-sm">
+              {ingredients.map((item, index) => (
+                <li key={`${item}-${index}`} className="flex items-start gap-3 group">
+                  <span className="mt-1.5 h-2 w-2 rounded-full bg-gradient-to-br from-primary to-primary/60 flex-shrink-0 group-hover:shadow-md group-hover:shadow-primary/50 transition-shadow" aria-hidden />
+                  <span className="text-foreground leading-relaxed">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : isLoading ? (
           <SkeletonList lines={4} />
         ) : (
@@ -337,17 +340,27 @@ function GeneratedContent({
 
       <section className="space-y-3">
         <SectionHeading>Instructions</SectionHeading>
-        {instructionLines.length > 0 ? (
-          <ol className="space-y-2 text-sm">
-            {instructionLines.map((line, index) => (
-              <li key={`${line}-${index}`} className="flex gap-3">
-                <span className="mt-[0.15rem] font-semibold text-muted-foreground">
-                  {(index + 1).toString().padStart(2, "0")}
-                </span>
-                <span>{line}</span>
-              </li>
-            ))}
-          </ol>
+        {cocktail?.instructions?.length && cocktail.instructions.length > 0 ? (
+          <div className="prose prose-sm dark:prose-invert max-w-none rounded-lg border border-border/50 bg-background/60 p-4 text-sm">
+            <ol className="space-y-3 text-sm [&>li]:marker:text-primary [&>li]:marker:font-semibold">
+              {cocktail.instructions.map((line, index) => (
+                <li key={index} className="marker:content-[counter(list-item,decimal)] pl-3">
+                  <div className="prose prose-sm dark:prose-invert max-w-none [&_*]:my-0 [&_code]:bg-secondary/40 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono [&_strong]:font-semibold [&_strong]:text-foreground [&_em]:text-muted-foreground">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ ...props }) => <span {...props} />,
+                        strong: ({ ...props }) => <strong className="font-semibold text-foreground" {...props} />,
+                        em: ({ ...props }) => <em className="italic text-muted-foreground" {...props} />,
+                        code: ({ ...props }) => <code className="bg-secondary/40 px-1.5 py-0.5 rounded text-xs font-mono" {...props} />,
+                      }}
+                    >
+                      {line}
+                    </ReactMarkdown>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
         ) : isLoading ? (
           <SkeletonList lines={3} />
         ) : (
@@ -360,11 +373,16 @@ function GeneratedContent({
       <section className="space-y-3">
         <SectionHeading>Notes</SectionHeading>
         {notesLines.length > 0 ? (
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            {notesLines.map((line, index) => (
-              <li key={`${line}-${index}`}>{line}</li>
-            ))}
-          </ul>
+          <div className="rounded-lg border border-border/50 bg-gradient-to-br from-secondary/20 via-background/60 to-background/80 p-4">
+            <ul className="space-y-2.5 text-sm text-foreground">
+              {notesLines.map((line, index) => (
+                <li key={`${line}-${index}`} className="flex items-start gap-3 leading-relaxed">
+                  <span className="inline-block mt-1 h-1.5 w-1.5 rounded-full bg-secondary/70 flex-shrink-0" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : isLoading ? (
           <SkeletonList lines={2} />
         ) : (
@@ -419,9 +437,11 @@ function ImagePreviewSection({
       <section className={`space-y-3 ${!isSecondary ? 'ring-2 ring-primary/20 rounded-3xl p-4 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5' : ''}`}>
         <SectionHeading className={!isSecondary ? 'text-primary font-bold' : ''}>Visual concept</SectionHeading>
         <figure className={`overflow-hidden ${!isSecondary ? 'rounded-3xl shadow-2xl border-2 border-primary/30' : 'rounded-2xl border border-border/70'} bg-background/90 shadow-inner shadow-black/5`}>
-          <img
+          <Image
             src={imageUrl}
             alt={imageAlt ?? "Concept cocktail render"}
+            width={500}
+            height={500}
             className="aspect-square h-auto w-full object-cover"
           />
           <figcaption className={`border-t ${!isSecondary ? 'border-primary/30 bg-primary/10' : 'border-border/70 bg-background/80'} px-4 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.25em] ${!isSecondary ? 'text-primary' : 'text-muted-foreground/80'}`}>
