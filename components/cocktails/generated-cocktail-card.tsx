@@ -178,11 +178,11 @@ export function GeneratedCocktailCard({
                     onRetry={onRetryImage}
                     isSecondary={false}
                   />
-                  <GeneratedContent cocktail={cocktail} isLoading={isLoading} />
+                  <GeneratedContent cocktail={cocktail} isLoading={isLoading} inputs={inputs} />
                 </>
               ) : (
                 <>
-                  <GeneratedContent cocktail={cocktail} isLoading={isLoading} />
+                  <GeneratedContent cocktail={cocktail} isLoading={isLoading} inputs={inputs} />
                   <ImagePreviewSection
                     status={imageStatus}
                     imageUrl={imageUrl}
@@ -331,9 +331,11 @@ function SummaryItem({
 function GeneratedContent({
   cocktail,
   isLoading,
+  inputs,
 }: {
   cocktail?: Partial<GenerateCocktail>
   isLoading: boolean
+  inputs?: CocktailInput | null
 }) {
   const ingredients = cocktail?.ingredients ?? []
   const tags = cocktail?.tags ?? []
@@ -458,6 +460,7 @@ function GeneratedContent({
             <ChatDialog
               cocktailName={cocktail.name}
               cocktailData={cocktail}
+              cocktailInputs={inputs ?? null}
               disabled={isLoading}
             />
           </div>

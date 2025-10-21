@@ -541,10 +541,10 @@ export default function HomePage() {
             </span>
             <div className="space-y-4">
               <h2 className="max-w-3xl text-4xl font-semibold leading-tight sm:text-5xl">
-                Design bar-ready cocktails in minutes.
+                Make more with what you have.
               </h2>
               <p className="max-w-3xl text-base text-muted-foreground sm:text-lg">
-                BarGuru turns surplus produce and half-bottles into polished concepts. Describe the vibe, and we&apos;ll draft measurements, prep notes, and a visual direction while you watch.
+                BarGuru turns excess inventory into beautiful cocktails. Describe the vibe, and we&apos;ll draft measurements, prep notes, and a visual direction while you watch.  Clear those shelves, make some money, and never compromise on quality.
               </p>
               <p className="text-sm text-muted-foreground/80">
                 Your last prompt stays pinned so iterating on a build or spinning up a variation is effortless.
