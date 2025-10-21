@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode, useRef } from "react"
 import Image from "next/image"
+import { useReactToPrint } from "react-to-print"
 import ReactMarkdown from "react-markdown"
 
 import type { CocktailInput, GenerateCocktail } from "@/schemas/cocktailSchemas"
@@ -36,6 +37,12 @@ export function GeneratedCocktailCard({
   onCreateNewCocktail,
 }: GeneratedCocktailCardProps) {
   const [isRequestExpanded, setIsRequestExpanded] = useState(false)
+  const printRef = useRef<HTMLDivElement>(null)
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `${cocktail?.name || "Cocktail"} Recipe`,
+  })
 
   useEffect(() => {
     if (inputs) {
@@ -71,15 +78,28 @@ export function GeneratedCocktailCard({
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
             Latest build
           </p>
-          {isLoading ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/40" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-              </span>
-              Streaming
-            </div>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {hasGeneratedContent && !isLoading && cocktail?.name ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handlePrint()}
+                className="text-xs"
+              >
+                🖨️ Print Recipe
+              </Button>
+            ) : null}
+            {isLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/40" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                </span>
+                Streaming
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {error ? <ErrorState error={error} /> : null}
@@ -104,41 +124,43 @@ export function GeneratedCocktailCard({
           </div>
         ) : null}
 
-        {/* Show cocktail content prominently during generation, feature image when ready */}
-        {hasGeneratedContent || isLoading ? (
-          <div className="space-y-6">
-            {imageStatus === "ready" && imageUrl ? (
-              /* When image is ready, feature it prominently with cocktail below */
-              <>
-                <ImagePreviewSection
-                  status={imageStatus}
-                  imageUrl={imageUrl}
-                  imageAlt={imageAlt}
-                  errorMessage={imageError}
-                  onRetry={onRetryImage}
-                  isSecondary={false}
-                />
-                <GeneratedContent cocktail={cocktail} isLoading={isLoading} />
-              </>
-            ) : (
-              /* During generation, show cocktail prominently with compact image status below */
-              <>
-                <GeneratedContent cocktail={cocktail} isLoading={isLoading} />
-                <ImagePreviewSection
-                  status={imageStatus}
-                  imageUrl={imageUrl}
-                  imageAlt={imageAlt}
-                  errorMessage={imageError}
-                  onRetry={onRetryImage}
-                  isSecondary={true}
-                />
-              </>
-            )}
-          </div>
-        ) : (
-          // When no content, show empty state without image
-          <EmptyState />
-        )}
+        <div ref={printRef} className="print-content">
+          {/* Show cocktail content prominently during generation, feature image when ready */}
+          {hasGeneratedContent || isLoading ? (
+            <div className="space-y-6">
+              {imageStatus === "ready" && imageUrl ? (
+                /* When image is ready, feature it prominently with cocktail below */
+                <>
+                  <ImagePreviewSection
+                    status={imageStatus}
+                    imageUrl={imageUrl}
+                    imageAlt={imageAlt}
+                    errorMessage={imageError}
+                    onRetry={onRetryImage}
+                    isSecondary={false}
+                  />
+                  <GeneratedContent cocktail={cocktail} isLoading={isLoading} />
+                </>
+              ) : (
+                /* During generation, show cocktail prominently with compact image status below */
+                <>
+                  <GeneratedContent cocktail={cocktail} isLoading={isLoading} />
+                  <ImagePreviewSection
+                    status={imageStatus}
+                    imageUrl={imageUrl}
+                    imageAlt={imageAlt}
+                    errorMessage={imageError}
+                    onRetry={onRetryImage}
+                    isSecondary={true}
+                  />
+                </>
+              )}
+            </div>
+          ) : (
+            // When no content, show empty state without image
+            <EmptyState />
+          )}
+        </div>
       </div>
     </div>
   )

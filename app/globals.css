@@ -136,4 +136,59 @@
   .cocktail-card-actions {
     display: none !important;
   }
+
+  .print-content {
+    background: white !important;
+    color: black !important;
+    padding: 20px;
+  }
+
+  /* Hide buttons and interactive elements during print */
+  button,
+  .chat-dialog,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Optimize images for print */
+  img {
+    max-width: 100%;
+    height: auto;
+    page-break-inside: avoid;
+  }
+
+  /* Prevent page breaks within sections */
+  section {
+    page-break-inside: avoid;
+  }
+
+  /* Ensure good spacing between sections */
+  section + section {
+    margin-top: 1rem;
+  }
+
+  /* Style headers for print */
+  h3,
+  h4 {
+    page-break-after: avoid;
+    margin-top: 0.5rem;
+  }
+
+  /* Optimize list display */
+  ul,
+  ol {
+    page-break-inside: avoid;
+  }
+
+  /* Remove backdrop and semi-transparent effects */
+  .prose,
+  .bg-gradient-to-br,
+  .bg-gradient-to-r {
+    background: white !important;
+  }
+
+  /* Style links for print */
+  a {
+    text-decoration: underline;
+  }
 }
