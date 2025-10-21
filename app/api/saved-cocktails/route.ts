@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { auth, currentUser } from "@clerk/nextjs/server"
 import { ZodError, z } from "zod"
 
-import { getSavedCocktailsForUser, saveCocktailForUser, getOrCreateUser } from "@/lib/db-utils"
+import { getSavedCocktailsForUser, saveCocktailForUser, deleteSavedCocktail, getOrCreateUser } from "@/lib/db-utils"
 import type { SavedCocktail } from "@/lib/db.schema"
 import {
   cocktailInputSchema,
@@ -14,6 +14,10 @@ const saveCocktailRequestSchema = z.object({
   cocktail: generateCocktailSchema,
   inputs: cocktailInputSchema.nullable().optional(),
   imageUrl: z.string().url().optional().nullable(),
+})
+
+const deleteCocktailRequestSchema = z.object({
+  cocktailId: z.number(),
 })
 
 function serializeSavedCocktail(record: SavedCocktail) {
@@ -97,5 +101,42 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Failed to save cocktail", error)
     return NextResponse.json({ error: "Unable to save cocktail." }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  const { userId } = await auth()
+
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  let payload: z.infer<typeof deleteCocktailRequestSchema>
+
+  try {
+    const body = await request.json()
+    payload = deleteCocktailRequestSchema.parse(body)
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { error: "Invalid cocktail ID.", details: error.issues },
+        { status: 400 },
+      )
+    }
+
+    return NextResponse.json({ error: "Unable to read request body." }, { status: 400 })
+  }
+
+  try {
+    const deletedRecord = await deleteSavedCocktail(userId, payload.cocktailId)
+
+    if (!deletedRecord) {
+      return NextResponse.json({ error: "Cocktail not found." }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, message: "Cocktail deleted successfully." })
+  } catch (error) {
+    console.error("Failed to delete cocktail", error)
+    return NextResponse.json({ error: "Unable to delete cocktail." }, { status: 500 })
   }
 }

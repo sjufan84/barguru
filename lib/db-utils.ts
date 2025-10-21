@@ -146,3 +146,17 @@ export async function getSavedCocktailsForUser(userId: string) {
     .where(eq(savedCocktails.userId, userId))
     .orderBy(desc(savedCocktails.createdAt));
 }
+
+export async function deleteSavedCocktail(userId: string, cocktailId: number) {
+  const [deletedRecord] = await db
+    .delete(savedCocktails)
+    .where(
+      and(
+        eq(savedCocktails.id, cocktailId),
+        eq(savedCocktails.userId, userId)
+      )
+    )
+    .returning();
+
+  return deletedRecord;
+}

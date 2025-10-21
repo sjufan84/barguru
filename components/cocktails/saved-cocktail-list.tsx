@@ -1,15 +1,17 @@
-import { Bookmark, Loader2 } from "lucide-react"
+import { Bookmark, Loader2, Trash2 } from "lucide-react"
 
 import type { SavedCocktail } from "@/schemas/cocktailSchemas"
 import { formatServiceStyle } from "@/lib/cocktail-form"
 import { cn } from "@/lib/utils"
 
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Button } from "@/components/ui/button"
 
 type SavedCocktailListProps = {
   cocktails: SavedCocktail[]
   isLoading: boolean
   onSelect: (cocktail: SavedCocktail) => void
+  onDelete: (cocktailId: number) => void
   selectedId?: number | null
 }
 
@@ -17,6 +19,7 @@ export function SavedCocktailList({
   cocktails,
   isLoading,
   onSelect,
+  onDelete,
   selectedId,
 }: SavedCocktailListProps) {
   return (
@@ -69,9 +72,24 @@ export function SavedCocktailList({
                         {buildSubtitle(cocktail)}
                       </p>
                     </div>
-                    <span className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-primary">
-                      Load
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDelete(cocktail.id)
+                        }}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        aria-label={`Delete ${cocktail.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <span className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-primary">
+                        Load
+                      </span>
+                    </div>
                   </div>
                   <p className="text-[0.6rem] uppercase tracking-[0.28em] text-muted-foreground">
                     {formatSavedTimestamp(cocktail.createdAt)}

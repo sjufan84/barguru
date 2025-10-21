@@ -190,6 +190,40 @@ export default function HomePage() {
     ],
   )
 
+  const handleDeleteSavedCocktail = useCallback(
+    async (cocktailId: number) => {
+      if (!isUserLoaded || !isSignedIn) {
+        return
+      }
+
+      try {
+        const response = await fetch("/api/saved-cocktails", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ cocktailId }),
+        })
+
+        if (!response.ok) {
+          throw new Error("Failed to delete cocktail")
+        }
+
+        // Remove the deleted cocktail from local state
+        setSavedCocktails(prev => prev.filter(cocktail => cocktail.id !== cocktailId))
+
+        // If the deleted cocktail was selected, clear the selection
+        if (selectedSavedCocktailId === cocktailId) {
+          handleCreateNewCocktail()
+        }
+      } catch (error) {
+        console.error("Failed to delete cocktail:", error)
+        // You could add toast notification here if you have a toast system
+      }
+    },
+    [isUserLoaded, isSignedIn, selectedSavedCocktailId, handleCreateNewCocktail]
+  )
+
   const handleSaveCocktail = useCallback(async () => {
     if (!isUserLoaded || !isSignedIn) {
       return
@@ -604,6 +638,7 @@ export default function HomePage() {
                   cocktails={savedCocktails}
                   isLoading={savedCocktailsLoading}
                   onSelect={handleSelectSavedCocktail}
+                  onDelete={handleDeleteSavedCocktail}
                   selectedId={selectedSavedCocktailId}
                 />
               ) : null}
