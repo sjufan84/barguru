@@ -71,6 +71,7 @@ export async function trackCocktailGeneration(userId: string | null, sessionId: 
 export async function checkAnonCocktailQuota(sessionId: string): Promise<{
   canGenerate: boolean;
   usageCount: number;
+  limit: number;
 }> {
   const usageRecords = await db
     .select()
@@ -87,6 +88,7 @@ export async function checkAnonCocktailQuota(sessionId: string): Promise<{
   return {
     canGenerate: usageCount < ANON_COCKTAIL_LIMIT,
     usageCount,
+    limit: ANON_COCKTAIL_LIMIT,
   };
 }
 

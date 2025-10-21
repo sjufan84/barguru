@@ -4,11 +4,14 @@ import { experimental_useObject as useObject } from "@ai-sdk/react"
 import type { FormEvent } from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 
+import { useUser } from "@clerk/nextjs"
+
 import { CocktailRequestForm } from "@/components/cocktails/cocktail-request-form"
 import { GeneratedCocktailCard } from "@/components/cocktails/generated-cocktail-card"
 import { ModeToggle } from "@/components/themes/mode-toggle"
 import { AuthButton } from "@/components/auth/user-button"
 import { QuotaAlert } from "@/components/cocktails/quota-alert"
+import { GuestTrialBanner } from "@/components/cocktails/guest-trial-banner"
 import type { CocktailInput, GenerateCocktail } from "@/schemas/cocktailSchemas"
 import { generateCocktailSchema } from "@/schemas/cocktailSchemas"
 import { useCocktailForm } from "@/hooks/use-cocktail-form"
@@ -22,14 +25,24 @@ interface QuotaExceededResponse {
   message: string
   requiresSignUp: boolean
   usageCount: number
+  limit?: number
 }
 
+const GUEST_COCKTAIL_LIMIT = 1
+const DEFAULT_QUOTA_MESSAGE =
+  "Your complimentary cocktail has been poured. Sign up with Clerk to craft unlimited menus."
+
 export default function HomePage() {
+  const { isLoaded: isUserLoaded, isSignedIn } = useUser()
   const generatedCardRef = useRef<HTMLDivElement>(null)
   const previousIsLoading = useRef(false)
   const [quotaExceeded, setQuotaExceeded] = useState(false)
-  const [quotaMessage, setQuotaMessage] = useState("")
+  const [quotaMessage, setQuotaMessage] = useState(DEFAULT_QUOTA_MESSAGE)
   const [usageCount, setUsageCount] = useState(0)
+  const [guestUsageCount, setGuestUsageCount] = useState(0)
+  const [complimentaryLimit, setComplimentaryLimit] = useState(
+    GUEST_COCKTAIL_LIMIT,
+  )
 
   const {
     formState,
@@ -92,6 +105,15 @@ export default function HomePage() {
   )
 
   useEffect(() => {
+    if (isUserLoaded && isSignedIn) {
+      setGuestUsageCount(0)
+      setComplimentaryLimit(GUEST_COCKTAIL_LIMIT)
+      setQuotaExceeded(false)
+      setQuotaMessage(DEFAULT_QUOTA_MESSAGE)
+    }
+  }, [isSignedIn, isUserLoaded])
+
+  useEffect(() => {
     if (
       typeof window !== "undefined" &&
       isLoading &&
@@ -144,31 +166,67 @@ export default function HomePage() {
       return
     }
 
+    const limitForGuests = Math.max(complimentaryLimit, GUEST_COCKTAIL_LIMIT)
+
+    if (isUserLoaded && !isSignedIn && guestUsageCount >= limitForGuests) {
+      setQuotaExceeded(true)
+      setQuotaMessage(DEFAULT_QUOTA_MESSAGE)
+      setUsageCount(guestUsageCount)
+      return
+    }
+
+    setQuotaMessage(DEFAULT_QUOTA_MESSAGE)
     resetFormCollapsePreferences()
     resetImageState()
     setLastSubmittedInputs(input)
 
     try {
       await submit(input)
+
+      if (isUserLoaded && !isSignedIn) {
+        const updatedLimit = Math.max(complimentaryLimit, GUEST_COCKTAIL_LIMIT)
+        setGuestUsageCount((current) =>
+          Math.min(current + 1, updatedLimit),
+        )
+      }
     } catch (submissionError) {
       // Check if it's a quota error
       if (submissionError instanceof Error) {
         const errorMessage = submissionError.message
         console.error("Submission error:", errorMessage)
-        
+
         // Check if error contains quota exceeded info
         if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded")) {
           try {
             // Try to parse the error response
             const quotaData = JSON.parse(errorMessage) as QuotaExceededResponse
+            const limitFromResponse = Math.max(
+              quotaData.limit ?? GUEST_COCKTAIL_LIMIT,
+              GUEST_COCKTAIL_LIMIT,
+            )
+            const usageFromResponse = Math.min(
+              Math.max(quotaData.usageCount ?? 0, 0),
+              limitFromResponse,
+            )
+
+            setComplimentaryLimit(limitFromResponse)
+            setGuestUsageCount((current) =>
+              Math.max(current, usageFromResponse),
+            )
             setQuotaExceeded(true)
-            setQuotaMessage(quotaData.message)
-            setUsageCount(quotaData.usageCount)
+            setQuotaMessage(quotaData.message || DEFAULT_QUOTA_MESSAGE)
+            setUsageCount(usageFromResponse)
           } catch {
             // If parsing fails, just show the error message
             setQuotaExceeded(true)
-            setQuotaMessage("You've reached your free quota. Sign up to generate unlimited cocktails!")
-            setUsageCount(1)
+            setQuotaMessage(DEFAULT_QUOTA_MESSAGE)
+            const fallbackLimit = Math.max(
+              complimentaryLimit,
+              GUEST_COCKTAIL_LIMIT,
+            )
+            const fallbackUsage = Math.max(guestUsageCount, fallbackLimit)
+            setGuestUsageCount((current) => Math.max(current, fallbackUsage))
+            setUsageCount(fallbackUsage)
           }
         }
       }
@@ -202,6 +260,7 @@ export default function HomePage() {
             <QuotaAlert
               message={quotaMessage}
               usageCount={usageCount}
+              limit={complimentaryLimit}
             />
           </div>
         )}
@@ -261,6 +320,12 @@ export default function HomePage() {
                 onRetryImage={handleRetryImage}
                 onCreateNewCocktail={handleCreateNewCocktail}
               />
+              {isUserLoaded && !isSignedIn && guestUsageCount > 0 ? (
+                <GuestTrialBanner
+                  usageCount={guestUsageCount}
+                  limit={complimentaryLimit}
+                />
+              ) : null}
             </div>
             <div className="mt-8 rounded-xl border border-border/60 bg-secondary/60 p-4 text-xs text-secondary-foreground">
               Tip: try contrasting inputs like &quot;charred citrus&quot; with &quot;after-dinner&quot; to

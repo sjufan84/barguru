@@ -72,11 +72,12 @@ export async function POST(request: Request) {
     canGenerate = quota.canGenerate
 
     if (!canGenerate) {
-      quotaMessage = `You've reached the limit of free cocktails (${quota.usageCount + 1} attempted). Sign up to create unlimited cocktails!`
-      
+      quotaMessage = `You've enjoyed your complimentary cocktail (${quota.usageCount} of ${quota.limit}). Sign up with Clerk to craft unlimited menus.`
+
       await trackServerEvent(sessionId, "cocktail_quota_exceeded", {
         attempt: quota.usageCount + 1,
         sessionId,
+        limit: quota.limit,
       })
 
       // Set session cookie before returning error
@@ -93,6 +94,7 @@ export async function POST(request: Request) {
           message: quotaMessage,
           requiresSignUp: true,
           usageCount: quota.usageCount,
+          limit: quota.limit,
         },
         { status: 429 }, // Too Many Requests
       )
